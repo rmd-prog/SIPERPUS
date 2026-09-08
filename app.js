@@ -1,50 +1,734 @@
-/* SIPERPUS SD V2 — Cloudflare Worker + D1 frontend */
-let API_BASE=(window.SIPERPUS_API_URL||localStorage.getItem('siperpus_api_url')||'').replace(/\/$/,'');
-const $=s=>document.querySelector(s);
-const esc=s=>String(s??'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
-const dateNow=()=>new Date().toISOString().slice(0,10);
-let currentUser=JSON.parse(sessionStorage.getItem('siperpus_user')||'null');
-let books=[],members=[],transactions=[];
+/* ============================================================
+   SIPERPUS SD V10 - app.js
+   Frontend logic. API_BASE hardcoded ke Cloudflare Worker.
+   ============================================================ */
 
-function ensureApiBase(){
-  if(API_BASE) return true;
-  const value=prompt('Masukkan URL Cloudflare Worker SIPERPUS:');
-  if(!value) return false;
-  API_BASE=value.trim().replace(/\/$/,'');
-  if(!/^https:\/\//i.test(API_BASE)){
-    alert('URL Worker harus diawali https://');
-    API_BASE='';
-    return false;
-  }
-  localStorage.setItem('siperpus_api_url',API_BASE);
-  return true;
+const API_BASE = "https://siperpus.adm-sd.workers.dev";
+
+/* ---------------- State ---------------- */
+const state = {
+  token: localStorage.getItem("siperpus_token") || null,
+  user: JSON.parse(localStorage.getItem("siperpus_user") || "null"),
+  books: [],
+  members: [],
+  transactions: [],
+  currentPage: "dashboard",
+};
+
+/* ---------------- Utilities ---------------- */
+
+function escapeHtml(str) {
+  if (str === null || str === undefined) return "";
+  return String(str)
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
 }
 
-async function api(path,options={}){
-  if(!ensureApiBase()) throw new Error('URL Worker belum diatur.');
-  const headers={'Content-Type':'application/json',...(options.headers||{})};
-  if(currentUser?.token) headers.Authorization=`Bearer ${currentUser.token}`;
-  const res=await fetch(API_BASE+path,{...options,headers});
-  let data={}; try{data=await res.json()}catch{}
-  if(!res.ok) throw new Error(data.error||`HTTP ${res.status}`);
+function formatDate(dateStr) {
+  if (!dateStr) return "-";
+  const d = new Date(dateStr);
+  if (isNaN(d.getTime())) return escapeHtml(dateStr);
+  return d.toLocaleDateString("id-ID", { day: "2-digit", month: "short", year: "numeric" });
+}
+
+function formatCurrency(n) {
+  const num = Number(n) || 0;
+  return "Rp " + num.toLocaleString("id-ID");
+}
+
+function todayISO() {
+  return new Date().toISOString().slice(0, 10);
+}
+
+function addDaysISO(dateStr, days) {
+  const d = dateStr ? new Date(dateStr) : new Date();
+  d.setDate(d.getDate() + days);
+  return d.toISOString().slice(0, 10);
+}
+
+function isOverdue(tx) {
+  if (tx.status !== "borrowed") return false;
+  const due = new Date(tx.due_date);
+  const now = new Date();
+  due.setHours(23, 59, 59, 999);
+  return now > due;
+}
+
+/* ---------------- Toast ---------------- */
+
+const ICONS = {
+  success: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 6 9 17l-5-5"/></svg>',
+  error: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 8v5M12 16h.01"/></svg>',
+  info: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 8h.01M11 12h1v5h1"/></svg>',
+};
+
+function showToast(message, type = "info") {
+  const container = document.getElementById("toast-container");
+  const toast = document.createElement("div");
+  toast.className = "toast " + type;
+  toast.innerHTML = (ICONS[type] || ICONS.info) + "<span>" + escapeHtml(message) + "</span>";
+  container.appendChild(toast);
+  setTimeout(() => {
+    toast.style.opacity = "0";
+    toast.style.transition = "opacity .25s";
+    setTimeout(() => toast.remove(), 250);
+  }, 3500);
+}
+
+/* ---------------- API wrapper ---------------- */
+
+async function apiFetch(path, options = {}) {
+  const headers = Object.assign(
+    { "Content-Type": "application/json" },
+    options.headers || {}
+  );
+  if (state.token) {
+    headers["Authorization"] = "Bearer " + state.token;
+  }
+
+  let res;
+  try {
+    res = await fetch(API_BASE + path, Object.assign({}, options, { headers }));
+  } catch (err) {
+    showToast("Tidak bisa terhubung ke server. Periksa koneksi internet.", "error");
+    throw err;
+  }
+
+  if (res.status === 401) {
+    handleUnauthorized();
+    throw new Error("Unauthorized");
+  }
+
+  let data = null;
+  const text = await res.text();
+  if (text) {
+    try {
+      data = JSON.parse(text);
+    } catch (e) {
+      data = null;
+    }
+  }
+
+  if (!res.ok) {
+    const msg = (data && (data.error || data.message)) || "Terjadi kesalahan pada server (" + res.status + ")";
+    throw new Error(msg);
+  }
+
   return data;
 }
-function setError(msg){$('#loginError').textContent=msg||''}
-function showPage(p){document.querySelectorAll('.page').forEach(x=>x.classList.add('hidden'));$('#page-'+p).classList.remove('hidden');document.querySelectorAll('.nav').forEach(x=>x.classList.toggle('active',x.dataset.page===p));$('#pageTitle').textContent={dashboard:'Dashboard',books:'Data Buku',members:'Data Anggota',transactions:'Transaksi'}[p];loadPage(p)}
-async function loadPage(p){try{if(p==='dashboard')await renderDashboard();if(p==='books')await renderBooks();if(p==='members')await renderMembers();if(p==='transactions')await renderTransactions()}catch(e){alert(e.message)}}
-async function renderDashboard(){const s=await api('/api/dashboard');$('#statBooks').textContent=s.books;$('#statMembers').textContent=s.members;$('#statBorrowed').textContent=s.borrowed;$('#statLate').textContent=s.late;const tx=await api('/api/transactions');$('#recentTransactions').innerHTML=tx.slice(0,5).map(t=>`<p><b>${esc(t.transaction_code)}</b> — ${esc(t.member_name)} meminjam ${esc(t.book_title)}</p>`).join('')||'<div class="empty">Belum ada transaksi.</div>'}
-async function renderBooks(){const q=($('#bookSearch').value||'').trim();books=await api('/api/books'+(q?'?q='+encodeURIComponent(q):''));$('#booksTable').innerHTML=books.map(b=>`<tr><td>${esc(b.code)}</td><td>${esc(b.title)}</td><td>${esc(b.author)}</td><td>${esc(b.category)}</td><td>${esc(b.class_level)}</td><td>${b.available}/${b.stock}</td><td><button onclick="editBook(${b.id})">Edit</button></td></tr>`).join('')||'<tr><td colspan="7">Belum ada buku.</td></tr>'}
-async function renderMembers(){const q=($('#memberSearch').value||'').trim();members=await api('/api/members'+(q?'?q='+encodeURIComponent(q):''));$('#membersTable').innerHTML=members.map(m=>`<tr><td>${esc(m.member_code)}</td><td>${esc(m.name)}</td><td>${esc(m.type)}</td><td>${esc(m.class_name)}</td><td>${esc(m.nis)}</td><td><span class="badge available">${m.active?'Aktif':'Nonaktif'}</span></td><td><button onclick="editMember(${m.id})">Edit</button></td></tr>`).join('')||'<tr><td colspan="7">Belum ada anggota.</td></tr>'}
-async function renderTransactions(){transactions=await api('/api/transactions');$('#transactionsTable').innerHTML=transactions.map(t=>{const late=t.status==='borrowed'&&t.due_date<dateNow();return `<tr><td>${esc(t.transaction_code)}</td><td>${esc(t.member_name)}</td><td>${esc(t.book_title)}</td><td>${t.borrow_date}</td><td>${t.due_date}</td><td>${t.return_date||'-'}</td><td><span class="badge ${late?'late':t.status==='returned'?'available':'borrowed'}">${late?'Terlambat':t.status==='returned'?'Dikembalikan':'Dipinjam'}</span></td></tr>`}).join('')||'<tr><td colspan="7">Belum ada transaksi.</td></tr>'}
-function modal(title,html,handler){$('#modalTitle').textContent=title;$('#modalForm').innerHTML=html;$('#modalForm').onsubmit=async e=>{e.preventDefault();try{await handler(new FormData(e.target));$('#modal').classList.add('hidden')}catch(err){alert(err.message)}};$('#modal').classList.remove('hidden')}
-function addBook(existing){modal(existing?'Edit Buku':'Tambah Buku',`<label>Kode Buku</label><input name="code" required value="${esc(existing?.code)}"><label>ISBN</label><input name="isbn" value="${esc(existing?.isbn)}"><label>Judul</label><input name="title" required value="${esc(existing?.title)}"><label>Pengarang</label><input name="author" value="${esc(existing?.author)}"><label>Penerbit</label><input name="publisher" value="${esc(existing?.publisher)}"><label>Tahun</label><input name="year" type="number" value="${esc(existing?.year)}"><label>Kategori</label><input name="category" value="${esc(existing?.category)}"><label>Kelas</label><input name="class_level" value="${esc(existing?.class_level)}"><label>Rak</label><input name="rack" value="${esc(existing?.rack)}"><label>Jumlah Stok</label><input name="stock" type="number" min="0" required value="${existing?.stock??1}"><button>Simpan</button>`,async f=>{const x=Object.fromEntries(f);if(existing)await api('/api/books/'+existing.id,{method:'PUT',body:JSON.stringify(x)});else await api('/api/books',{method:'POST',body:JSON.stringify(x)});await renderBooks();await renderDashboard()})}
-window.editBook=x=>addBook(books.find(b=>b.id===Number(x)));
-function addMember(existing){modal(existing?'Edit Anggota':'Tambah Anggota',`<label>No. Anggota</label><input name="member_code" required value="${esc(existing?.member_code)}"><label>Nama</label><input name="name" required value="${esc(existing?.name)}"><label>Tipe</label><select name="type"><option value="siswa" ${existing?.type==='siswa'?'selected':''}>siswa</option><option value="guru" ${existing?.type==='guru'?'selected':''}>guru</option></select><label>Kelas</label><input name="class_name" value="${esc(existing?.class_name)}"><label>NIS</label><input name="nis" value="${esc(existing?.nis)}"><label>Telepon</label><input name="phone" value="${esc(existing?.phone)}"><label>Status</label><select name="active"><option value="true" ${existing?.active!==0?'selected':''}>Aktif</option><option value="false" ${existing?.active===0?'selected':''}>Nonaktif</option></select><button>Simpan</button>`,async f=>{const x=Object.fromEntries(f);x.active=x.active!=='false';if(existing)await api('/api/members/'+existing.id,{method:'PUT',body:JSON.stringify(x)});else await api('/api/members',{method:'POST',body:JSON.stringify(x)});await renderMembers();await renderDashboard()})}
-window.editMember=x=>addMember(members.find(m=>m.id===Number(x)));
-async function borrow(){members=await api('/api/members');books=await api('/api/books');const available=books.filter(b=>Number(b.available)>0);if(!members.length||!available.length)return alert('Tambahkan anggota dan buku yang tersedia terlebih dahulu.');modal('Peminjaman',`<label>Anggota</label><select name="member_id" required>${members.filter(m=>m.active).map(m=>`<option value="${m.id}">${esc(m.member_code)} — ${esc(m.name)}</option>`).join('')}</select><label>Buku</label><select name="book_id" required>${available.map(b=>`<option value="${b.id}">${esc(b.code)} — ${esc(b.title)} (tersedia ${b.available})</option>`).join('')}</select><label>Jatuh Tempo</label><input name="due_date" type="date" required value="${new Date(Date.now()+7*864e5).toISOString().slice(0,10)}"><button>Proses Peminjaman</button>`,async f=>{const x=Object.fromEntries(f);await api('/api/transactions/borrow',{method:'POST',body:JSON.stringify(x)});await renderTransactions();await renderDashboard()})}
-async function ret(){transactions=await api('/api/transactions');const active=transactions.filter(t=>t.status==='borrowed');if(!active.length)return alert('Tidak ada buku yang sedang dipinjam.');modal('Pengembalian',`<label>Transaksi</label><select name="trx_id" required>${active.map(t=>`<option value="${t.id}">${esc(t.transaction_code)} — ${esc(t.member_name)} — ${esc(t.book_title)}</option>`).join('')}</select><button>Proses Pengembalian</button>`,async f=>{const x=Object.fromEntries(f);const r=await api('/api/transactions/'+x.trx_id+'/return',{method:'POST'});if(r.fine)alert('Pengembalian berhasil. Denda: Rp '+Number(r.fine).toLocaleString('id-ID'));await renderTransactions();await renderDashboard()})}
-$('#loginForm').onsubmit=async e=>{e.preventDefault();setError('');try{const r=await api('/api/login',{method:'POST',body:JSON.stringify({username:$('#username').value,password:$('#password').value})});currentUser={token:r.token,...r.user};sessionStorage.setItem('siperpus_user',JSON.stringify(currentUser));$('#loginPage').classList.add('hidden');$('#app').classList.remove('hidden');$('#userName').textContent=currentUser.name;showPage('dashboard')}catch(err){setError(err.message)}};
-$('#logoutBtn').onclick=()=>{sessionStorage.removeItem('siperpus_user');location.reload()};
-document.querySelectorAll('.nav').forEach(b=>b.onclick=()=>showPage(b.dataset.page));
-$('#addBookBtn').onclick=()=>addBook();$('#addMemberBtn').onclick=()=>addMember();$('#borrowBtn').onclick=borrow;$('#returnBtn').onclick=ret;$('#closeModal').onclick=()=>$('#modal').classList.add('hidden');$('#bookSearch').oninput=()=>renderBooks();$('#memberSearch').oninput=()=>renderMembers();$('#today').textContent=new Date().toLocaleDateString('id-ID',{dateStyle:'full'});
-if(currentUser){$('#loginPage').classList.add('hidden');$('#app').classList.remove('hidden');$('#userName').textContent=currentUser.name;showPage('dashboard')}
+
+function handleUnauthorized() {
+  clearSession();
+  showLoginView();
+  showToast("Sesi berakhir, silakan masuk kembali.", "error");
+}
+
+function clearSession() {
+  state.token = null;
+  state.user = null;
+  localStorage.removeItem("siperpus_token");
+  localStorage.removeItem("siperpus_user");
+}
+
+/* ---------------- Auth / views ---------------- */
+
+function showLoginView() {
+  document.getElementById("login-view").style.display = "flex";
+  document.getElementById("app-view").style.display = "none";
+}
+
+function showAppView() {
+  document.getElementById("login-view").style.display = "none";
+  document.getElementById("app-view").style.display = "block";
+  document.getElementById("sidebar-username").textContent = state.user?.name || state.user?.username || "-";
+  document.getElementById("sidebar-role").textContent = state.user?.role || "-";
+  const hour = new Date().getHours();
+  const greet = hour < 11 ? "Selamat pagi" : hour < 15 ? "Selamat siang" : hour < 18 ? "Selamat sore" : "Selamat malam";
+  document.getElementById("dashboard-greeting").textContent = greet + ", " + (state.user?.name || state.user?.username || "");
+}
+
+async function handleLogin(e) {
+  e.preventDefault();
+  const username = document.getElementById("login-username").value.trim();
+  const password = document.getElementById("login-password").value;
+  const errorBox = document.getElementById("login-error");
+  const submitBtn = document.getElementById("login-submit");
+  errorBox.style.display = "none";
+
+  if (!username || !password) return;
+
+  submitBtn.disabled = true;
+  submitBtn.textContent = "Memproses...";
+
+  try {
+    const data = await apiFetch("/api/login", {
+      method: "POST",
+      body: JSON.stringify({ username, password }),
+    });
+
+    if (!data || !data.token) {
+      throw new Error("Login gagal, respons tidak valid.");
+    }
+
+    state.token = data.token;
+    state.user = data.user || { username };
+    localStorage.setItem("siperpus_token", state.token);
+    localStorage.setItem("siperpus_user", JSON.stringify(state.user));
+
+    showAppView();
+    navigateTo("dashboard");
+    showToast("Berhasil masuk. Selamat bekerja!", "success");
+  } catch (err) {
+    errorBox.textContent = err.message || "Username atau password salah.";
+    errorBox.style.display = "block";
+  } finally {
+    submitBtn.disabled = false;
+    submitBtn.textContent = "Masuk";
+  }
+}
+
+function handleLogout() {
+  clearSession();
+  showLoginView();
+  document.getElementById("login-form").reset();
+  showToast("Berhasil keluar.", "info");
+}
+
+/* ---------------- Navigation ---------------- */
+
+function navigateTo(page) {
+  state.currentPage = page;
+  document.querySelectorAll(".page").forEach((el) => el.classList.remove("active"));
+  document.getElementById("page-" + page).classList.add("active");
+  document.querySelectorAll(".nav-link").forEach((el) => {
+    el.classList.toggle("active", el.dataset.page === page);
+  });
+  closeSidebarMobile();
+
+  if (page === "dashboard") loadDashboard();
+  if (page === "buku") loadBooks();
+  if (page === "anggota") loadMembers();
+  if (page === "transaksi") loadTransactions();
+}
+
+function closeSidebarMobile() {
+  document.getElementById("sidebar").classList.remove("open");
+  document.getElementById("sidebar-backdrop").classList.remove("active");
+}
+
+/* ---------------- Modal helpers ---------------- */
+
+function openModal(id) {
+  document.getElementById(id).classList.add("active");
+}
+function closeModal(id) {
+  document.getElementById(id).classList.remove("active");
+}
+
+/* ---------------- Dashboard ---------------- */
+
+async function loadDashboard() {
+  const body = document.getElementById("dashboard-recent-body");
+  body.innerHTML = '<tr><td colspan="5" class="loading-row"><span class="spinner"></span>Memuat data...</td></tr>';
+
+  try {
+    const data = await apiFetch("/api/dashboard");
+
+    document.getElementById("stat-total-buku").textContent = data.total_books ?? data.totalBooks ?? "0";
+    document.getElementById("stat-total-anggota").textContent = data.total_members ?? data.totalMembers ?? "0";
+    document.getElementById("stat-dipinjam").textContent = data.borrowed_count ?? data.borrowedCount ?? "0";
+    document.getElementById("stat-terlambat").textContent = data.overdue_count ?? data.overdueCount ?? "0";
+
+    const recent = data.recent_transactions || data.recentTransactions || [];
+    if (!recent.length) {
+      body.innerHTML = '<tr><td colspan="5"><div class="empty-state"><p>Belum ada transaksi.</p></div></td></tr>';
+      return;
+    }
+
+    body.innerHTML = recent
+      .map(
+        (tx) => `
+      <tr>
+        <td class="cell-title">${escapeHtml(tx.transaction_code)}</td>
+        <td>${escapeHtml(tx.member_name || tx.member || "-")}</td>
+        <td>${escapeHtml(tx.book_title || tx.book || "-")}</td>
+        <td>${formatDate(tx.borrow_date)}</td>
+        <td>${statusBadge(tx)}</td>
+      </tr>`
+      )
+      .join("");
+  } catch (err) {
+    if (err.message !== "Unauthorized") {
+      body.innerHTML = '<tr><td colspan="5"><div class="empty-state"><p>Gagal memuat dashboard: ' + escapeHtml(err.message) + "</p></div></td></tr>";
+    }
+  }
+}
+
+function statusBadge(tx) {
+  if (tx.status === "returned") return '<span class="badge badge-success">Dikembalikan</span>';
+  if (isOverdue(tx)) return '<span class="badge badge-danger">Terlambat</span>';
+  if (tx.status === "borrowed") return '<span class="badge badge-warn">Dipinjam</span>';
+  return '<span class="badge badge-neutral">' + escapeHtml(tx.status) + "</span>";
+}
+
+/* ---------------- Data Buku ---------------- */
+
+async function loadBooks() {
+  const body = document.getElementById("buku-table-body");
+  body.innerHTML = '<tr><td colspan="8" class="loading-row"><span class="spinner"></span>Memuat data buku...</td></tr>';
+  try {
+    const data = await apiFetch("/api/books");
+    state.books = data.books || data.data || data || [];
+    renderBooks(state.books);
+  } catch (err) {
+    if (err.message !== "Unauthorized") {
+      body.innerHTML = '<tr><td colspan="8"><div class="empty-state"><p>Gagal memuat buku: ' + escapeHtml(err.message) + "</p></div></td></tr>";
+    }
+  }
+}
+
+function renderBooks(list) {
+  const body = document.getElementById("buku-table-body");
+  if (!list.length) {
+    body.innerHTML = '<tr><td colspan="8"><div class="empty-state"><p>Belum ada buku yang cocok.</p></div></td></tr>';
+    return;
+  }
+  body.innerHTML = list
+    .map(
+      (b) => `
+    <tr>
+      <td>
+        <div class="cell-title">${escapeHtml(b.title)}</div>
+        <div class="cell-sub">${escapeHtml(b.code)}${b.author ? " &middot; " + escapeHtml(b.author) : ""}</div>
+      </td>
+      <td>${escapeHtml(b.category || "-")}</td>
+      <td>${escapeHtml(b.class_level || "-")}</td>
+      <td>${escapeHtml(b.rack || "-")}</td>
+      <td>${escapeHtml(b.stock)}</td>
+      <td>${escapeHtml(b.available)}</td>
+      <td>${conditionBadge(b.condition)}</td>
+      <td><button class="btn btn-ghost btn-sm" data-edit-buku="${b.id}">Edit</button></td>
+    </tr>`
+    )
+    .join("");
+}
+
+function conditionBadge(cond) {
+  if (cond === "Rusak Berat") return '<span class="badge badge-danger">' + escapeHtml(cond) + "</span>";
+  if (cond === "Rusak Ringan") return '<span class="badge badge-warn">' + escapeHtml(cond) + "</span>";
+  return '<span class="badge badge-success">' + escapeHtml(cond || "Baik") + "</span>";
+}
+
+function openBukuModal(book) {
+  document.getElementById("form-buku").reset();
+  document.getElementById("buku-id").value = "";
+  document.getElementById("modal-buku-title").textContent = book ? "Edit Buku" : "Tambah Buku";
+  if (book) {
+    document.getElementById("buku-id").value = book.id;
+    document.getElementById("buku-code").value = book.code || "";
+    document.getElementById("buku-isbn").value = book.isbn || "";
+    document.getElementById("buku-title").value = book.title || "";
+    document.getElementById("buku-author").value = book.author || "";
+    document.getElementById("buku-publisher").value = book.publisher || "";
+    document.getElementById("buku-year").value = book.year || "";
+    document.getElementById("buku-category").value = book.category || "";
+    document.getElementById("buku-class-level").value = book.class_level || "";
+    document.getElementById("buku-rack").value = book.rack || "";
+    document.getElementById("buku-stock").value = book.stock ?? 0;
+    document.getElementById("buku-condition").value = book.condition || "Baik";
+  }
+  openModal("modal-buku");
+}
+
+async function saveBuku() {
+  const id = document.getElementById("buku-id").value;
+  const payload = {
+    code: document.getElementById("buku-code").value.trim(),
+    isbn: document.getElementById("buku-isbn").value.trim(),
+    title: document.getElementById("buku-title").value.trim(),
+    author: document.getElementById("buku-author").value.trim(),
+    publisher: document.getElementById("buku-publisher").value.trim(),
+    year: document.getElementById("buku-year").value ? Number(document.getElementById("buku-year").value) : null,
+    category: document.getElementById("buku-category").value.trim(),
+    class_level: document.getElementById("buku-class-level").value.trim(),
+    rack: document.getElementById("buku-rack").value.trim(),
+    stock: Number(document.getElementById("buku-stock").value || 0),
+    condition: document.getElementById("buku-condition").value,
+  };
+
+  if (!payload.code || !payload.title) {
+    showToast("Kode buku dan judul wajib diisi.", "error");
+    return;
+  }
+  if (!id) {
+    payload.available = payload.stock;
+  }
+
+  const btn = document.getElementById("save-buku-btn");
+  btn.disabled = true;
+  btn.textContent = "Menyimpan...";
+  try {
+    if (id) {
+      await apiFetch("/api/books/" + id, { method: "PUT", body: JSON.stringify(payload) });
+      showToast("Buku berhasil diperbarui.", "success");
+    } else {
+      await apiFetch("/api/books", { method: "POST", body: JSON.stringify(payload) });
+      showToast("Buku berhasil ditambahkan.", "success");
+    }
+    closeModal("modal-buku");
+    loadBooks();
+  } catch (err) {
+    if (err.message !== "Unauthorized") showToast(err.message, "error");
+  } finally {
+    btn.disabled = false;
+    btn.textContent = "Simpan";
+  }
+}
+
+/* ---------------- Anggota ---------------- */
+
+async function loadMembers() {
+  const body = document.getElementById("anggota-table-body");
+  body.innerHTML = '<tr><td colspan="6" class="loading-row"><span class="spinner"></span>Memuat data anggota...</td></tr>';
+  try {
+    const data = await apiFetch("/api/members");
+    state.members = data.members || data.data || data || [];
+    renderMembers(state.members);
+  } catch (err) {
+    if (err.message !== "Unauthorized") {
+      body.innerHTML = '<tr><td colspan="6"><div class="empty-state"><p>Gagal memuat anggota: ' + escapeHtml(err.message) + "</p></div></td></tr>";
+    }
+  }
+}
+
+function renderMembers(list) {
+  const body = document.getElementById("anggota-table-body");
+  if (!list.length) {
+    body.innerHTML = '<tr><td colspan="6"><div class="empty-state"><p>Belum ada anggota yang cocok.</p></div></td></tr>';
+    return;
+  }
+  body.innerHTML = list
+    .map(
+      (m) => `
+    <tr>
+      <td>
+        <div class="cell-title">${escapeHtml(m.name)}</div>
+        <div class="cell-sub">${escapeHtml(m.member_code)}</div>
+      </td>
+      <td><span class="badge badge-neutral">${escapeHtml(capitalize(m.type))}</span></td>
+      <td>${escapeHtml(m.class_name || "-")}</td>
+      <td>${escapeHtml(m.nis || "-")}</td>
+      <td>${escapeHtml(m.phone || "-")}</td>
+      <td><button class="btn btn-ghost btn-sm" data-edit-anggota="${m.id}">Edit</button></td>
+    </tr>`
+    )
+    .join("");
+}
+
+function capitalize(s) {
+  if (!s) return "-";
+  return s.charAt(0).toUpperCase() + s.slice(1);
+}
+
+function openAnggotaModal(member) {
+  document.getElementById("form-anggota").reset();
+  document.getElementById("anggota-id").value = "";
+  document.getElementById("modal-anggota-title").textContent = member ? "Edit Anggota" : "Tambah Anggota";
+  if (member) {
+    document.getElementById("anggota-id").value = member.id;
+    document.getElementById("anggota-code").value = member.member_code || "";
+    document.getElementById("anggota-type").value = member.type || "siswa";
+    document.getElementById("anggota-name").value = member.name || "";
+    document.getElementById("anggota-class").value = member.class_name || "";
+    document.getElementById("anggota-nis").value = member.nis || "";
+    document.getElementById("anggota-phone").value = member.phone || "";
+  }
+  openModal("modal-anggota");
+}
+
+async function saveAnggota() {
+  const id = document.getElementById("anggota-id").value;
+  const payload = {
+    member_code: document.getElementById("anggota-code").value.trim(),
+    type: document.getElementById("anggota-type").value,
+    name: document.getElementById("anggota-name").value.trim(),
+    class_name: document.getElementById("anggota-class").value.trim(),
+    nis: document.getElementById("anggota-nis").value.trim(),
+    phone: document.getElementById("anggota-phone").value.trim(),
+  };
+
+  if (!payload.member_code || !payload.name) {
+    showToast("Kode anggota dan nama wajib diisi.", "error");
+    return;
+  }
+
+  const btn = document.getElementById("save-anggota-btn");
+  btn.disabled = true;
+  btn.textContent = "Menyimpan...";
+  try {
+    if (id) {
+      await apiFetch("/api/members/" + id, { method: "PUT", body: JSON.stringify(payload) });
+      showToast("Anggota berhasil diperbarui.", "success");
+    } else {
+      await apiFetch("/api/members", { method: "POST", body: JSON.stringify(payload) });
+      showToast("Anggota berhasil ditambahkan.", "success");
+    }
+    closeModal("modal-anggota");
+    loadMembers();
+  } catch (err) {
+    if (err.message !== "Unauthorized") showToast(err.message, "error");
+  } finally {
+    btn.disabled = false;
+    btn.textContent = "Simpan";
+  }
+}
+
+/* ---------------- Transaksi ---------------- */
+
+async function loadTransactions() {
+  const body = document.getElementById("transaksi-table-body");
+  body.innerHTML = '<tr><td colspan="8" class="loading-row"><span class="spinner"></span>Memuat transaksi...</td></tr>';
+  try {
+    const data = await apiFetch("/api/transactions");
+    state.transactions = data.transactions || data.data || data || [];
+    renderTransactions(state.transactions);
+  } catch (err) {
+    if (err.message !== "Unauthorized") {
+      body.innerHTML = '<tr><td colspan="8"><div class="empty-state"><p>Gagal memuat transaksi: ' + escapeHtml(err.message) + "</p></div></td></tr>";
+    }
+  }
+}
+
+function renderTransactions(list) {
+  const body = document.getElementById("transaksi-table-body");
+  if (!list.length) {
+    body.innerHTML = '<tr><td colspan="8"><div class="empty-state"><p>Belum ada transaksi yang cocok.</p></div></td></tr>';
+    return;
+  }
+  body.innerHTML = list
+    .map(
+      (tx) => `
+    <tr>
+      <td class="cell-title">${escapeHtml(tx.transaction_code)}</td>
+      <td>${escapeHtml(tx.member_name || tx.member || "-")}</td>
+      <td>${escapeHtml(tx.book_title || tx.book || "-")}</td>
+      <td>${formatDate(tx.borrow_date)}</td>
+      <td>${formatDate(tx.due_date)}</td>
+      <td>${statusBadge(tx)}</td>
+      <td>${tx.fine ? formatCurrency(tx.fine) : "-"}</td>
+      <td>${
+        tx.status === "borrowed"
+          ? `<button class="btn btn-ghost btn-sm" data-return-tx="${tx.id}">Kembalikan</button>`
+          : ""
+      }</td>
+    </tr>`
+    )
+    .join("");
+}
+
+function populateSelect(selectEl, items, valueKey, labelFn, placeholder) {
+  selectEl.innerHTML = `<option value="">${placeholder}</option>` + items.map((it) => `<option value="${it[valueKey]}">${escapeHtml(labelFn(it))}</option>`).join("");
+}
+
+async function openPinjamModal() {
+  document.getElementById("form-pinjam").reset();
+  try {
+    if (!state.members.length) await loadMembers();
+    if (!state.books.length) await loadBooks();
+  } catch (e) {
+    /* ignored, handled elsewhere */
+  }
+  populateSelect(
+    document.getElementById("pinjam-member"),
+    state.members.filter((m) => m.active !== 0),
+    "id",
+    (m) => `${m.name} (${m.member_code})`,
+    "Pilih anggota..."
+  );
+  populateSelect(
+    document.getElementById("pinjam-book"),
+    state.books.filter((b) => b.available > 0),
+    "id",
+    (b) => `${b.title} — tersedia ${b.available}`,
+    "Pilih buku..."
+  );
+  document.getElementById("pinjam-borrow-date").value = todayISO();
+  document.getElementById("pinjam-due-date").value = addDaysISO(todayISO(), 7);
+  openModal("modal-pinjam");
+}
+
+async function savePinjam() {
+  const member_id = document.getElementById("pinjam-member").value;
+  const book_id = document.getElementById("pinjam-book").value;
+  const borrow_date = document.getElementById("pinjam-borrow-date").value;
+  const due_date = document.getElementById("pinjam-due-date").value;
+
+  if (!member_id || !book_id || !borrow_date || !due_date) {
+    showToast("Lengkapi semua data peminjaman.", "error");
+    return;
+  }
+
+  const btn = document.getElementById("save-pinjam-btn");
+  btn.disabled = true;
+  btn.textContent = "Menyimpan...";
+  try {
+    await apiFetch("/api/transactions/borrow", {
+      method: "POST",
+      body: JSON.stringify({ member_id: Number(member_id), book_id: Number(book_id), borrow_date, due_date }),
+    });
+    showToast("Peminjaman berhasil dicatat.", "success");
+    closeModal("modal-pinjam");
+    loadTransactions();
+    loadBooks();
+  } catch (err) {
+    if (err.message !== "Unauthorized") showToast(err.message, "error");
+  } finally {
+    btn.disabled = false;
+    btn.textContent = "Simpan Peminjaman";
+  }
+}
+
+let pendingReturnTx = null;
+
+function openKembaliModal(tx) {
+  pendingReturnTx = tx;
+  document.getElementById("kembali-info").textContent = `${tx.book_title || tx.book || "Buku"} — dipinjam oleh ${tx.member_name || tx.member || "-"}`;
+  document.getElementById("kembali-fine").value = 0;
+  openModal("modal-kembali");
+}
+
+async function saveKembali() {
+  if (!pendingReturnTx) return;
+  const fine = Number(document.getElementById("kembali-fine").value || 0);
+  const btn = document.getElementById("save-kembali-btn");
+  btn.disabled = true;
+  btn.textContent = "Memproses...";
+  try {
+    await apiFetch(`/api/transactions/${pendingReturnTx.id}/return`, {
+      method: "POST",
+      body: JSON.stringify({ return_date: todayISO(), fine }),
+    });
+    showToast("Buku berhasil dikembalikan.", "success");
+    closeModal("modal-kembali");
+    pendingReturnTx = null;
+    loadTransactions();
+    loadBooks();
+    if (state.currentPage === "dashboard") loadDashboard();
+  } catch (err) {
+    if (err.message !== "Unauthorized") showToast(err.message, "error");
+  } finally {
+    btn.disabled = false;
+    btn.textContent = "Konfirmasi Kembali";
+  }
+}
+
+/* ---------------- Search / filter (client-side) ---------------- */
+
+function debounce(fn, delay) {
+  let t;
+  return (...args) => {
+    clearTimeout(t);
+    t = setTimeout(() => fn(...args), delay);
+  };
+}
+
+function setupSearch(inputId, dataGetter, renderFn) {
+  const input = document.getElementById(inputId);
+  input.addEventListener(
+    "input",
+    debounce(() => {
+      const q = input.value.trim().toLowerCase();
+      const data = dataGetter();
+      if (!q) {
+        renderFn(data);
+        return;
+      }
+      const filtered = data.filter((item) => JSON.stringify(item).toLowerCase().includes(q));
+      renderFn(filtered);
+    }, 200)
+  );
+}
+
+/* ---------------- Event wiring ---------------- */
+
+function wireEvents() {
+  document.getElementById("login-form").addEventListener("submit", handleLogin);
+  document.getElementById("logout-btn").addEventListener("click", handleLogout);
+
+  document.querySelectorAll(".nav-link").forEach((btn) => {
+    btn.addEventListener("click", () => navigateTo(btn.dataset.page));
+  });
+
+  document.getElementById("hamburger-btn").addEventListener("click", () => {
+    document.getElementById("sidebar").classList.add("open");
+    document.getElementById("sidebar-backdrop").classList.add("active");
+  });
+  document.getElementById("sidebar-backdrop").addEventListener("click", closeSidebarMobile);
+
+  document.querySelectorAll("[data-close]").forEach((btn) => {
+    btn.addEventListener("click", () => closeModal(btn.dataset.close));
+  });
+  document.querySelectorAll(".modal-overlay").forEach((overlay) => {
+    overlay.addEventListener("click", (e) => {
+      if (e.target === overlay) overlay.classList.remove("active");
+    });
+  });
+
+  document.getElementById("btn-tambah-buku").addEventListener("click", () => openBukuModal(null));
+  document.getElementById("save-buku-btn").addEventListener("click", saveBuku);
+  document.getElementById("buku-table-body").addEventListener("click", (e) => {
+    const btn = e.target.closest("[data-edit-buku]");
+    if (!btn) return;
+    const book = state.books.find((b) => String(b.id) === btn.dataset.editBuku);
+    if (book) openBukuModal(book);
+  });
+
+  document.getElementById("btn-tambah-anggota").addEventListener("click", () => openAnggotaModal(null));
+  document.getElementById("save-anggota-btn").addEventListener("click", saveAnggota);
+  document.getElementById("anggota-table-body").addEventListener("click", (e) => {
+    const btn = e.target.closest("[data-edit-anggota]");
+    if (!btn) return;
+    const member = state.members.find((m) => String(m.id) === btn.dataset.editAnggota);
+    if (member) openAnggotaModal(member);
+  });
+
+  document.getElementById("btn-catat-pinjam").addEventListener("click", openPinjamModal);
+  document.getElementById("save-pinjam-btn").addEventListener("click", savePinjam);
+  document.getElementById("save-kembali-btn").addEventListener("click", saveKembali);
+  document.getElementById("transaksi-table-body").addEventListener("click", (e) => {
+    const btn = e.target.closest("[data-return-tx]");
+    if (!btn) return;
+    const tx = state.transactions.find((t) => String(t.id) === btn.dataset.returnTx);
+    if (tx) openKembaliModal(tx);
+  });
+
+  document.querySelectorAll("[data-quick]").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      const action = btn.dataset.quick;
+      if (action === "tambah-buku") openBukuModal(null);
+      if (action === "tambah-anggota") openAnggotaModal(null);
+      if (action === "pinjam") openPinjamModal();
+    });
+  });
+
+  setupSearch("search-buku", () => state.books, renderBooks);
+  setupSearch("search-anggota", () => state.members, renderMembers);
+  setupSearch("search-transaksi", () => state.transactions, renderTransactions);
+}
+
+/* ---------------- Init ---------------- */
+
+function init() {
+  wireEvents();
+  if (state.token && state.user) {
+    showAppView();
+    navigateTo("dashboard");
+  } else {
+    showLoginView();
+  }
+}
+
+document.addEventListener("DOMContentLoaded", init);
