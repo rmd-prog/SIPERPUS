@@ -22,7 +22,7 @@ async function sha256(text) {
 }
 
 async function hmac(secret, text) {
-  const key = await crypto.subtle.importKey('raw', new TextEncoder().encode(secret), { name: 'HMAC', hash: 'SHA-256' }, false, ['sign', 'verify']);
+  const key = await crypto.subtle.importKey('raw', new TextEncoder().encode(secret), { name: 'HMAC', hash: 'SHA-256' }, false, ['sign']);
   const sig = await crypto.subtle.sign('HMAC', key, new TextEncoder().encode(text));
   return [...new Uint8Array(sig)].map(b => b.toString(16).padStart(2, '0')).join('');
 }
@@ -42,7 +42,9 @@ async function auth(request, env) {
   const [userId, expires, signature] = parts;
   if (!/^\d+$/.test(userId) || !/^\d+$/.test(expires) || Number(expires) < Date.now()) return null;
   const secret = env.SESSION_SECRET || env.SETUP_KEY;
-  if (!secret || !(await hmac(secret, `${userId}.${expires}`)).toLowerCase() === signature.toLowerCase()) return null;
+  if (!secret) return null;
+  const expected = await hmac(secret, `${userId}.${expires}`);
+  if (expected.toLowerCase() !== signature.toLowerCase()) return null;
   return await env.DB.prepare('SELECT id,username,name,role FROM users WHERE id=? AND active=1').bind(Number(userId)).first();
 }
 
@@ -80,9 +82,7 @@ export default {
         const count = await env.DB.prepare('SELECT COUNT(*) AS n FROM users').first();
         if (Number(count?.n || 0) > 0) return json({ error: 'Akun sudah ada. Setup ditolak.' }, 409, origin);
         const x = await body(request);
-        const username = clean(x.username || 'admin', 100);
-        const password = String(x.password || '');
-        const name = clean(x.name || 'Administrator', 150);
+        const username = clean(x.username || 'admin', 100), password = String(x.password || ''), name = clean(x.name || 'Administrator', 150);
         if (!username || !password || password.length < 8 || !name) return json({ error: 'Username, nama, dan password minimal 8 karakter wajib diisi.' }, 400, origin);
         await env.DB.prepare('INSERT INTO users (username,password_hash,name,role,active) VALUES (?,?,?,?,1)').bind(username, await sha256(password), name, 'admin').run();
         return json({ ok: true, message: 'Admin berhasil dibuat.' }, 201, origin);
@@ -106,20 +106,16 @@ export default {
       if (path === '/api/books') {
         if (request.method === 'GET') {
           const q = clean(url.searchParams.get('q'), 100);
-          const result = q
-            ? await env.DB.prepare("SELECT * FROM books WHERE code LIKE ? OR title LIKE ? OR author LIKE ? OR category LIKE ? OR class_level LIKE ? ORDER BY id DESC").bind(`%${q}%`,`%${q}%`,`%${q}%`,`%${q}%`,`%${q}%`).all()
-            : await env.DB.prepare('SELECT * FROM books ORDER BY id DESC').all();
+          const result = q ? await env.DB.prepare("SELECT * FROM books WHERE code LIKE ? OR title LIKE ? OR author LIKE ? OR category LIKE ? OR class_level LIKE ? ORDER BY id DESC").bind(`%${q}%`,`%${q}%`,`%${q}%`,`%${q}%`,`%${q}%`).all() : await env.DB.prepare('SELECT * FROM books ORDER BY id DESC').all();
           return json(result.results || [], 200, origin);
         }
         if (request.method === 'POST') {
-          const x = await body(request);
-          const code = clean(x.code, 100), title = clean(x.title, 300);
+          const x = await body(request), code = clean(x.code, 100), title = clean(x.title, 300);
           if (!code || !title) return json({ error: 'Kode dan judul buku wajib diisi.' }, 400, origin);
           const stock = Math.max(0, Math.floor(Number(x.stock ?? 0)) || 0);
           if (stock > 100000) return json({ error: 'Stok terlalu besar.' }, 400, origin);
           try {
-            await env.DB.prepare('INSERT INTO books (code,isbn,title,author,publisher,year,category,class_level,rack,stock,available,cover,condition) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)')
-              .bind(code,clean(x.isbn,100)||null,title,clean(x.author,200)||null,clean(x.publisher,200)||null,x.year ? Number(x.year) : null,clean(x.category,100)||null,clean(x.class_level,100)||null,clean(x.rack,100)||null,stock,stock,clean(x.cover,1000)||null,clean(x.condition,50)||'Baik').run();
+            await env.DB.prepare('INSERT INTO books (code,isbn,title,author,publisher,year,category,class_level,rack,stock,available,cover,condition) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)').bind(code,clean(x.isbn,100)||null,title,clean(x.author,200)||null,clean(x.publisher,200)||null,x.year ? Number(x.year) : null,clean(x.category,100)||null,clean(x.class_level,100)||null,clean(x.rack,100)||null,stock,stock,clean(x.cover,1000)||null,clean(x.condition,50)||'Baik').run();
           } catch (e) { return json({ error: uniqueError(e, 'Gagal menambahkan buku.') }, 400, origin); }
           return json({ ok: true }, 201, origin);
         }
@@ -132,12 +128,10 @@ export default {
         if (!old) return json({ error: 'Buku tidak ditemukan.' }, 404, origin);
         const code = clean(x.code,100), title = clean(x.title,300);
         if (!code || !title) return json({ error: 'Kode dan judul buku wajib diisi.' }, 400, origin);
-        const stock = Math.max(0, Math.floor(Number(x.stock ?? old.stock)) || 0);
-        const borrowed = Math.max(0, Number(old.stock || 0) - Number(old.available || 0));
+        const stock = Math.max(0, Math.floor(Number(x.stock ?? old.stock)) || 0), borrowed = Math.max(0, Number(old.stock || 0) - Number(old.available || 0));
         if (stock < borrowed) return json({ error: `Stok tidak boleh kurang dari jumlah buku yang sedang dipinjam (${borrowed}).` }, 400, origin);
         try {
-          await env.DB.prepare('UPDATE books SET code=?,isbn=?,title=?,author=?,publisher=?,year=?,category=?,class_level=?,rack=?,stock=?,available=?,cover=?,condition=? WHERE id=?')
-            .bind(code,clean(x.isbn,100)||null,title,clean(x.author,200)||null,clean(x.publisher,200)||null,x.year ? Number(x.year) : null,clean(x.category,100)||null,clean(x.class_level,100)||null,clean(x.rack,100)||null,stock,stock-borrowed,clean(x.cover,1000)||null,clean(x.condition,50)||'Baik',id).run();
+          await env.DB.prepare('UPDATE books SET code=?,isbn=?,title=?,author=?,publisher=?,year=?,category=?,class_level=?,rack=?,stock=?,available=?,cover=?,condition=? WHERE id=?').bind(code,clean(x.isbn,100)||null,title,clean(x.author,200)||null,clean(x.publisher,200)||null,x.year ? Number(x.year) : null,clean(x.category,100)||null,clean(x.class_level,100)||null,clean(x.rack,100)||null,stock,stock-borrowed,clean(x.cover,1000)||null,clean(x.condition,50)||'Baik',id).run();
         } catch (e) { return json({ error: uniqueError(e, 'Gagal memperbarui buku.') }, 400, origin); }
         return json({ ok: true }, 200, origin);
       }
@@ -145,18 +139,14 @@ export default {
       if (path === '/api/members') {
         if (request.method === 'GET') {
           const q = clean(url.searchParams.get('q'), 100);
-          const result = q
-            ? await env.DB.prepare("SELECT * FROM members WHERE member_code LIKE ? OR name LIKE ? OR nis LIKE ? OR class_name LIKE ? ORDER BY id DESC").bind(`%${q}%`,`%${q}%`,`%${q}%`,`%${q}%`).all()
-            : await env.DB.prepare('SELECT * FROM members ORDER BY id DESC').all();
+          const result = q ? await env.DB.prepare("SELECT * FROM members WHERE member_code LIKE ? OR name LIKE ? OR nis LIKE ? OR class_name LIKE ? ORDER BY id DESC").bind(`%${q}%`,`%${q}%`,`%${q}%`,`%${q}%`).all() : await env.DB.prepare('SELECT * FROM members ORDER BY id DESC').all();
           return json(result.results || [], 200, origin);
         }
         if (request.method === 'POST') {
           const x = await body(request), code = clean(x.member_code,100), name = clean(x.name,200);
           if (!code || !name) return json({ error: 'No. anggota dan nama wajib diisi.' }, 400, origin);
-          try {
-            await env.DB.prepare('INSERT INTO members (member_code,name,type,class_name,nis,phone,active) VALUES (?,?,?,?,?,?,1)')
-              .bind(code,name,clean(x.type,30)||'siswa',clean(x.class_name,100)||null,clean(x.nis,100)||null,clean(x.phone,50)||null).run();
-          } catch (e) { return json({ error: uniqueError(e, 'Gagal menambahkan anggota.') }, 400, origin); }
+          try { await env.DB.prepare('INSERT INTO members (member_code,name,type,class_name,nis,phone,active) VALUES (?,?,?,?,?,?,1)').bind(code,name,clean(x.type,30)||'siswa',clean(x.class_name,100)||null,clean(x.nis,100)||null,clean(x.phone,50)||null).run(); }
+          catch (e) { return json({ error: uniqueError(e, 'Gagal menambahkan anggota.') }, 400, origin); }
           return json({ ok: true }, 201, origin);
         }
       }
@@ -167,10 +157,8 @@ export default {
         if (!await env.DB.prepare('SELECT id FROM members WHERE id=?').bind(id).first()) return json({ error: 'Anggota tidak ditemukan.' }, 404, origin);
         const code = clean(x.member_code,100), name = clean(x.name,200);
         if (!code || !name) return json({ error: 'No. anggota dan nama wajib diisi.' }, 400, origin);
-        try {
-          await env.DB.prepare('UPDATE members SET member_code=?,name=?,type=?,class_name=?,nis=?,phone=?,active=? WHERE id=?')
-            .bind(code,name,clean(x.type,30)||'siswa',clean(x.class_name,100)||null,clean(x.nis,100)||null,clean(x.phone,50)||null,x.active === false ? 0 : 1,id).run();
-        } catch (e) { return json({ error: uniqueError(e, 'Gagal memperbarui anggota.') }, 400, origin); }
+        try { await env.DB.prepare('UPDATE members SET member_code=?,name=?,type=?,class_name=?,nis=?,phone=?,active=? WHERE id=?').bind(code,name,clean(x.type,30)||'siswa',clean(x.class_name,100)||null,clean(x.nis,100)||null,clean(x.phone,50)||null,x.active === false ? 0 : 1,id).run(); }
+        catch (e) { return json({ error: uniqueError(e, 'Gagal memperbarui anggota.') }, 400, origin); }
         return json({ ok: true }, 200, origin);
       }
 
@@ -180,9 +168,7 @@ export default {
       }
 
       if (path === '/api/transactions/borrow' && request.method === 'POST') {
-        const x = await body(request), memberId = Number(x.member_id), bookId = Number(x.book_id);
-        const borrowDate = validDate(x.borrow_date) ? x.borrow_date : today();
-        const dueDate = x.due_date;
+        const x = await body(request), memberId = Number(x.member_id), bookId = Number(x.book_id), borrowDate = validDate(x.borrow_date) ? x.borrow_date : today(), dueDate = x.due_date;
         if (!Number.isInteger(memberId) || memberId < 1 || !Number.isInteger(bookId) || bookId < 1 || !validDate(dueDate)) return json({ error: 'Anggota, buku, dan tanggal yang valid wajib diisi.' }, 400, origin);
         if (dueDate < borrowDate) return json({ error: 'Tanggal jatuh tempo tidak boleh sebelum tanggal pinjam.' }, 400, origin);
         const member = await env.DB.prepare('SELECT id,name FROM members WHERE id=? AND active=1').bind(memberId).first();
@@ -199,8 +185,7 @@ export default {
 
       const returnMatch = path.match(/^\/api\/transactions\/(\d+)\/return$/);
       if (returnMatch && request.method === 'POST') {
-        const id = Number(returnMatch[1]);
-        const trx = await env.DB.prepare('SELECT id,book_id,status,due_date FROM transactions WHERE id=?').bind(id).first();
+        const id = Number(returnMatch[1]), trx = await env.DB.prepare('SELECT id,book_id,status,due_date FROM transactions WHERE id=?').bind(id).first();
         if (!trx) return json({ error: 'Transaksi tidak ditemukan.' }, 404, origin);
         if (trx.status === 'returned') return json({ error: 'Transaksi sudah dikembalikan.' }, 400, origin);
         const overdueDays = trx.due_date < today() ? Math.max(0, Math.floor((Date.parse(today()) - Date.parse(trx.due_date)) / 86400000)) : 0;
