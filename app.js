@@ -495,6 +495,48 @@ async function saveAnggota() {
   }
 }
 
+/* ---------------- Delete handlers ---------------- */
+
+async function deleteBuku(id) {
+  const book = state.books.find((b) => String(b.id) === String(id));
+  if (!book || !confirm(`Hapus buku "${book.title}"?`)) return;
+  try {
+    await apiFetch("/api/books/" + id, { method: "DELETE" });
+    showToast("Buku berhasil dihapus.", "success");
+    loadBooks();
+    if (state.currentPage === "dashboard") loadDashboard();
+  } catch (err) {
+    if (err.message !== "Unauthorized") showToast(err.message, "error");
+  }
+}
+
+async function deleteAnggota(id) {
+  const member = state.members.find((m) => String(m.id) === String(id));
+  if (!member || !confirm(`Hapus anggota "${member.name}"?`)) return;
+  try {
+    await apiFetch("/api/members/" + id, { method: "DELETE" });
+    showToast("Anggota berhasil dihapus.", "success");
+    loadMembers();
+    if (state.currentPage === "dashboard") loadDashboard();
+  } catch (err) {
+    if (err.message !== "Unauthorized") showToast(err.message, "error");
+  }
+}
+
+async function deleteTransaksi(id) {
+  const tx = state.transactions.find((t) => String(t.id) === String(id));
+  if (!tx || !confirm(`Hapus transaksi ${tx.transaction_code || "ini"}?`)) return;
+  try {
+    await apiFetch("/api/transactions/" + id, { method: "DELETE" });
+    showToast("Transaksi berhasil dihapus.", "success");
+    loadTransactions();
+    loadBooks();
+    if (state.currentPage === "dashboard") loadDashboard();
+  } catch (err) {
+    if (err.message !== "Unauthorized") showToast(err.message, "error");
+  }
+}
+
 /* ---------------- Transaksi ---------------- */
 
 async function loadTransactions() {
@@ -530,8 +572,8 @@ function renderTransactions(list) {
       <td>${tx.fine ? formatCurrency(tx.fine) : "-"}</td>
       <td>${
         tx.status === "borrowed"
-          ? `<button class="btn btn-ghost btn-sm" data-return-tx="${tx.id}">Kembalikan</button>`
-          : ""
+          ? `<button class="btn btn-ghost btn-sm" data-return-tx="${tx.id}">Kembalikan</button> <button class="btn btn-sm" style="background:#dc2626" data-delete-tx="${tx.id}">Hapus</button>`
+          : `<button class="btn btn-sm" style="background:#dc2626" data-delete-tx="${tx.id}">Hapus</button>`
       }</td>
     </tr>`
     )
@@ -688,6 +730,8 @@ function wireEvents() {
   document.getElementById("btn-tambah-buku").addEventListener("click", () => openBukuModal(null));
   document.getElementById("save-buku-btn").addEventListener("click", saveBuku);
   document.getElementById("buku-table-body").addEventListener("click", (e) => {
+    const deleteBtn = e.target.closest("[data-delete-buku]");
+    if (deleteBtn) return deleteBuku(deleteBtn.dataset.deleteBuku);
     const btn = e.target.closest("[data-edit-buku]");
     if (!btn) return;
     const book = state.books.find((b) => String(b.id) === btn.dataset.editBuku);
@@ -697,6 +741,8 @@ function wireEvents() {
   document.getElementById("btn-tambah-anggota").addEventListener("click", () => openAnggotaModal(null));
   document.getElementById("save-anggota-btn").addEventListener("click", saveAnggota);
   document.getElementById("anggota-table-body").addEventListener("click", (e) => {
+    const deleteBtn = e.target.closest("[data-delete-anggota]");
+    if (deleteBtn) return deleteAnggota(deleteBtn.dataset.deleteAnggota);
     const btn = e.target.closest("[data-edit-anggota]");
     if (!btn) return;
     const member = state.members.find((m) => String(m.id) === btn.dataset.editAnggota);
@@ -707,6 +753,8 @@ function wireEvents() {
   document.getElementById("save-pinjam-btn").addEventListener("click", savePinjam);
   document.getElementById("save-kembali-btn").addEventListener("click", saveKembali);
   document.getElementById("transaksi-table-body").addEventListener("click", (e) => {
+    const deleteBtn = e.target.closest("[data-delete-tx]");
+    if (deleteBtn) return deleteTransaksi(deleteBtn.dataset.deleteTx);
     const btn = e.target.closest("[data-return-tx]");
     if (!btn) return;
     const tx = state.transactions.find((t) => String(t.id) === btn.dataset.returnTx);
