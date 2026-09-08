@@ -1,0 +1,8 @@
+name = "siperpus-api"
+main = "src/index.js"
+compatibility_date = "2026-09-08"
+
+[[d1_databases]]
+binding = "DB"
+database_name = "SIPERPUS_DB"
+database_id = "20415873-2fac-4d5d-97bc-2ac207ba2109"
