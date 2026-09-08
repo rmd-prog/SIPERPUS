@@ -3,630 +3,76 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>SIPERPUS SD - Sistem Informasi Perpustakaan</title>
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600;9..144,700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<title>SIPERPUS SDN MUARASARI 1</title>
 <style>
-  :root{
-    --navy:#1E3A5F;
-    --navy-dark:#132A45;
-    --gold:#E8A33D;
-    --gold-dark:#C97F1E;
-    --bg:#F6F5F1;
-    --surface:#FFFFFF;
-    --border:#E4E2DB;
-    --text:#1B1E24;
-    --text-soft:#666B74;
-    --success:#2F8558;
-    --success-bg:#E7F5EC;
-    --danger:#C1443C;
-    --danger-bg:#FBEAE8;
-    --warn:#B7791F;
-    --warn-bg:#FCF3E1;
-    --radius:10px;
-    --shadow:0 1px 2px rgba(20,24,32,.06), 0 4px 14px rgba(20,24,32,.05);
-  }
-  *{box-sizing:border-box;}
-  html,body{margin:0;padding:0;}
-  body{
-    font-family:'Inter',-apple-system,sans-serif;
-    background:var(--bg);
-    color:var(--text);
-    -webkit-font-smoothing:antialiased;
-  }
-  h1,h2,h3,.brand-name{font-family:'Fraunces',serif;}
-  a{color:inherit;}
-  button{font-family:inherit;cursor:pointer;}
-  input,select{font-family:inherit;}
-  ::selection{background:var(--gold);color:var(--navy-dark);}
-
-  /* ---------- Utility ---------- */
-  .hidden{display:none !important;}
-  .visually-hidden{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);}
-
-  /* ---------- Login ---------- */
-  #login-view{
-    min-height:100vh;
-    display:flex;
-    align-items:center;
-    justify-content:center;
-    background:
-      radial-gradient(circle at 15% 20%, rgba(232,163,61,.14), transparent 45%),
-      radial-gradient(circle at 85% 80%, rgba(30,58,95,.10), transparent 50%),
-      var(--bg);
-    padding:24px;
-  }
-  .login-card{
-    width:100%;
-    max-width:380px;
-    background:var(--surface);
-    border:1px solid var(--border);
-    border-radius:16px;
-    box-shadow:var(--shadow);
-    padding:40px 32px 32px;
-  }
-  .login-mark{
-    width:48px;height:48px;border-radius:12px;
-    background:var(--navy);
-    display:flex;align-items:center;justify-content:center;
-    margin-bottom:20px;
-  }
-  .login-mark svg{width:26px;height:26px;}
-  .login-card h1{
-    font-size:24px;font-weight:600;margin:0 0 4px;color:var(--navy-dark);
-  }
-  .login-card p.sub{
-    margin:0 0 28px;color:var(--text-soft);font-size:14px;
-  }
-  .field{margin-bottom:16px;}
-  .field label{
-    display:block;font-size:13px;font-weight:600;margin-bottom:6px;color:var(--text);
-  }
-  .field input{
-    width:100%;padding:11px 13px;border:1.5px solid var(--border);border-radius:9px;
-    font-size:14.5px;color:var(--text);background:#FCFCFB;
-    transition:border-color .15s, background .15s;
-  }
-  .field input:focus{
-    outline:none;border-color:var(--navy);background:#fff;
-  }
-  .btn{
-    display:inline-flex;align-items:center;justify-content:center;gap:8px;
-    border:none;border-radius:9px;padding:11px 18px;font-size:14.5px;font-weight:600;
-    transition:transform .08s ease, background .15s, box-shadow .15s;
-  }
-  .btn:active{transform:scale(.98);}
-  .btn-primary{background:var(--navy);color:#fff;width:100%;}
-  .btn-primary:hover{background:var(--navy-dark);}
-  .btn-gold{background:var(--gold);color:var(--navy-dark);}
-  .btn-gold:hover{background:var(--gold-dark);color:#fff;}
-  .btn-ghost{background:transparent;color:var(--navy);border:1.5px solid var(--border);}
-  .btn-ghost:hover{border-color:var(--navy);}
-  .btn-danger-outline{background:transparent;color:var(--danger);border:1.5px solid var(--danger-bg);}
-  .btn-danger-outline:hover{background:var(--danger-bg);}
-  .btn[disabled]{opacity:.6;pointer-events:none;}
-  .btn-sm{padding:7px 12px;font-size:13px;border-radius:7px;}
-
-  .login-error{
-    background:var(--danger-bg);color:var(--danger);font-size:13.5px;
-    padding:10px 12px;border-radius:8px;margin-bottom:16px;display:none;
-  }
-  .login-foot{margin-top:22px;font-size:12.5px;color:var(--text-soft);text-align:center;}
-
-  /* ---------- App shell ---------- */
-  #app-view{display:none;min-height:100vh;}
-  .shell{display:flex;min-height:100vh;}
-
-  .sidebar{
-    width:236px;flex-shrink:0;background:var(--navy-dark);color:#EFF3F8;
-    display:flex;flex-direction:column;
-    position:fixed;top:0;bottom:0;left:0;z-index:40;
-    transition:transform .2s ease;
-  }
-  .sidebar-brand{
-    display:flex;align-items:center;gap:10px;padding:22px 20px 18px;
-    border-bottom:1px solid rgba(255,255,255,.08);
-  }
-  .sidebar-brand .mark{
-    width:34px;height:34px;border-radius:9px;background:var(--gold);
-    display:flex;align-items:center;justify-content:center;flex-shrink:0;
-  }
-  .sidebar-brand .mark svg{width:19px;height:19px;color:var(--navy-dark);}
-  .sidebar-brand .name{font-family:'Fraunces',serif;font-size:16.5px;font-weight:600;line-height:1.2;}
-  .sidebar-brand .name small{display:block;font-family:'Inter',sans-serif;font-weight:400;font-size:11px;color:#9FB0C4;}
-
-  .nav-list{list-style:none;margin:0;padding:14px 12px;flex:1;}
-  .nav-list li{margin-bottom:3px;}
-  .nav-link{
-    display:flex;align-items:center;gap:11px;padding:10px 12px;border-radius:8px;
-    color:#C9D4E2;font-size:14px;font-weight:500;text-decoration:none;
-    border:none;background:none;width:100%;text-align:left;
-  }
-  .nav-link svg{width:18px;height:18px;flex-shrink:0;}
-  .nav-link:hover{background:rgba(255,255,255,.06);color:#fff;}
-  .nav-link.active{background:var(--gold);color:var(--navy-dark);font-weight:600;}
-
-  .sidebar-user{
-    padding:14px 20px 20px;border-top:1px solid rgba(255,255,255,.08);
-  }
-  .sidebar-user .who{font-size:13.5px;font-weight:600;margin-bottom:2px;}
-  .sidebar-user .role{font-size:11.5px;color:#9FB0C4;margin-bottom:12px;text-transform:capitalize;}
-  .logout-btn{
-    width:100%;background:rgba(255,255,255,.06);color:#EFF3F8;border:1px solid rgba(255,255,255,.12);
-    border-radius:8px;padding:8px 10px;font-size:13px;font-weight:600;display:flex;align-items:center;gap:8px;justify-content:center;
-  }
-  .logout-btn:hover{background:rgba(255,255,255,.12);}
-
-  .main{margin-left:236px;flex:1;min-width:0;display:flex;flex-direction:column;min-height:100vh;}
-  .topbar{
-    display:none;align-items:center;justify-content:space-between;
-    padding:14px 18px;background:var(--surface);border-bottom:1px solid var(--border);
-    position:sticky;top:0;z-index:30;
-  }
-  .hamburger{
-    width:38px;height:38px;border-radius:8px;border:1px solid var(--border);background:#fff;
-    display:flex;align-items:center;justify-content:center;
-  }
-  .hamburger svg{width:18px;height:18px;}
-  .topbar-brand{font-family:'Fraunces',serif;font-weight:600;font-size:16px;color:var(--navy-dark);}
-
-  .content{padding:28px 32px 60px;flex:1;}
-  .page{display:none;}
-  .page.active{display:block;}
-
-  .page-head{
-    display:flex;align-items:flex-end;justify-content:space-between;flex-wrap:wrap;gap:14px;margin-bottom:22px;
-  }
-  .page-head h2{font-size:23px;margin:0 0 4px;color:var(--navy-dark);font-weight:600;}
-  .page-head p{margin:0;color:var(--text-soft);font-size:13.5px;}
-
-  /* stat cards */
-  .stat-grid{
-    display:grid;grid-template-columns:repeat(4,1fr);gap:16px;margin-bottom:26px;
-  }
-  .stat-card{
-    background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);
-    padding:18px 20px;box-shadow:var(--shadow);
-  }
-  .stat-card .label{font-size:12.5px;color:var(--text-soft);font-weight:600;margin-bottom:10px;display:flex;align-items:center;gap:8px;}
-  .stat-card .icon{width:26px;height:26px;border-radius:7px;display:flex;align-items:center;justify-content:center;flex-shrink:0;}
-  .stat-card .icon svg{width:14px;height:14px;}
-  .stat-card .value{font-family:'Fraunces',serif;font-size:30px;font-weight:600;color:var(--navy-dark);}
-  .icon-navy{background:#E7ECF2;color:var(--navy);}
-  .icon-gold{background:var(--warn-bg);color:var(--gold-dark);}
-  .icon-green{background:var(--success-bg);color:var(--success);}
-  .icon-red{background:var(--danger-bg);color:var(--danger);}
-
-  .panel{
-    background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);
-    box-shadow:var(--shadow);overflow:hidden;
-  }
-  .panel-head{
-    display:flex;align-items:center;justify-content:space-between;padding:16px 20px;border-bottom:1px solid var(--border);flex-wrap:wrap;gap:10px;
-  }
-  .panel-head h3{margin:0;font-size:15.5px;font-weight:600;color:var(--navy-dark);}
-
-  .quick-actions{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:26px;}
-
-  /* toolbar (search + add) */
-  .toolbar{
-    display:flex;gap:12px;align-items:center;flex-wrap:wrap;margin-bottom:16px;
-  }
-  .search-box{
-    position:relative;flex:1;min-width:200px;max-width:340px;
-  }
-  .search-box svg{
-    position:absolute;left:12px;top:50%;transform:translateY(-50%);width:15px;height:15px;color:var(--text-soft);
-  }
-  .search-box input{
-    width:100%;padding:10px 12px 10px 34px;border:1.5px solid var(--border);border-radius:9px;font-size:14px;background:#FCFCFB;
-  }
-  .search-box input:focus{outline:none;border-color:var(--navy);background:#fff;}
-
-  /* table */
-  .table-wrap{overflow-x:auto;}
-  table{width:100%;border-collapse:collapse;min-width:640px;}
-  thead th{
-    text-align:left;font-size:11.5px;text-transform:uppercase;letter-spacing:.03em;color:var(--text-soft);
-    padding:11px 16px;border-bottom:1px solid var(--border);background:#FAFAF8;white-space:nowrap;
-  }
-  tbody td{padding:13px 16px;border-bottom:1px solid var(--border);font-size:13.8px;vertical-align:middle;}
-  tbody tr:last-child td{border-bottom:none;}
-  tbody tr:hover{background:#FAFAF8;}
-  .cell-title{font-weight:600;color:var(--text);}
-  .cell-sub{font-size:12px;color:var(--text-soft);margin-top:2px;}
-
-  .badge{
-    display:inline-flex;align-items:center;padding:3px 10px;border-radius:99px;font-size:12px;font-weight:600;
-  }
-  .badge-success{background:var(--success-bg);color:var(--success);}
-  .badge-warn{background:var(--warn-bg);color:var(--warn);}
-  .badge-danger{background:var(--danger-bg);color:var(--danger);}
-  .badge-neutral{background:#EEEDE8;color:var(--text-soft);}
-
-  .empty-state{padding:48px 20px;text-align:center;color:var(--text-soft);}
-  .empty-state svg{width:36px;height:36px;margin-bottom:10px;color:#C7CBD2;}
-  .empty-state p{margin:0;font-size:14px;}
-
-  .loading-row{padding:36px 0;text-align:center;color:var(--text-soft);font-size:13.5px;}
-  .spinner{
-    width:18px;height:18px;border:2.5px solid var(--border);border-top-color:var(--navy);border-radius:50%;
-    display:inline-block;animation:spin .7s linear infinite;vertical-align:-4px;margin-right:8px;
-  }
-  @keyframes spin{to{transform:rotate(360deg);}}
-
-  /* modal */
-  .modal-overlay{
-    position:fixed;inset:0;background:rgba(20,24,32,.44);display:none;align-items:center;justify-content:center;
-    z-index:100;padding:20px;
-  }
-  .modal-overlay.active{display:flex;}
-  .modal{
-    background:#fff;border-radius:14px;width:100%;max-width:480px;max-height:90vh;
-    display:flex;flex-direction:column;box-shadow:0 20px 60px rgba(0,0,0,.25);
-  }
-  .modal-head{
-    display:flex;align-items:center;justify-content:space-between;padding:18px 22px;border-bottom:1px solid var(--border);
-  }
-  .modal-head h3{margin:0;font-size:16.5px;font-weight:600;color:var(--navy-dark);}
-  .modal-close{
-    width:30px;height:30px;border-radius:8px;border:none;background:#F1F0EC;display:flex;align-items:center;justify-content:center;
-  }
-  .modal-close svg{width:14px;height:14px;}
-  .modal-body{padding:20px 22px;overflow-y:auto;}
-  .modal-foot{padding:16px 22px;border-top:1px solid var(--border);display:flex;justify-content:flex-end;gap:10px;}
-  .form-row{display:grid;grid-template-columns:1fr 1fr;gap:14px;}
-  .form-row.single{grid-template-columns:1fr;}
-  .field select{
-    width:100%;padding:11px 13px;border:1.5px solid var(--border);border-radius:9px;font-size:14.5px;background:#FCFCFB;
-  }
-  .field select:focus{outline:none;border-color:var(--navy);}
-  .field-hint{font-size:12px;color:var(--text-soft);margin-top:5px;}
-
-  /* toast */
-  #toast-container{
-    position:fixed;bottom:20px;right:20px;z-index:200;display:flex;flex-direction:column;gap:10px;max-width:340px;
-  }
-  .toast{
-    background:var(--navy-dark);color:#fff;padding:13px 16px;border-radius:10px;font-size:13.8px;
-    box-shadow:0 10px 30px rgba(0,0,0,.2);display:flex;align-items:flex-start;gap:10px;
-    animation:toast-in .18s ease;
-  }
-  .toast svg{width:17px;height:17px;flex-shrink:0;margin-top:1px;}
-  .toast.success{background:#1F4D37;}
-  .toast.error{background:#5C231F;}
-  @keyframes toast-in{from{opacity:0;transform:translateY(8px);}to{opacity:1;transform:translateY(0);}}
-
-  .sidebar-backdrop{
-    display:none;position:fixed;inset:0;background:rgba(20,24,32,.4);z-index:39;
-  }
-  .sidebar-backdrop.active{display:block;}
-
-  @media (max-width: 900px){
-    .sidebar{transform:translateX(-100%);}
-    .sidebar.open{transform:translateX(0);}
-    .main{margin-left:0;}
-    .topbar{display:flex;}
-    .content{padding:20px 16px 48px;}
-    .stat-grid{grid-template-columns:1fr 1fr;}
-    .form-row{grid-template-columns:1fr;}
-  }
-  @media (max-width: 480px){
-    .stat-grid{grid-template-columns:1fr;}
-    .page-head{align-items:flex-start;}
-    #toast-container{left:16px;right:16px;max-width:none;}
-  }
+html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#f6f5f1}
+#app-frame{display:block;width:100%;height:100%;border:0}
 </style>
 </head>
 <body>
+<iframe id="app-frame" src="index-original.html" title="SIPERPUS SDN Muarasari 1"></iframe>
+<script>
+(function(){
+  const school='./logo%20ms%201%20proses%20%281%29.png';
+  const bogor='./images.png';
+  const frame=document.getElementById('app-frame');
+  function applyBranding(){
+    try{
+      const d=frame.contentDocument;
+      if(!d||!d.head)return;
+      if(d.getElementById('siperpus-branding-v1'))return;
+      const style=d.createElement('style');
+      style.id='siperpus-branding-v1';
+      style.textContent=`
+        .login-mark{display:none!important}
+        .siperpus-login-logos{display:flex;align-items:center;justify-content:center;gap:12px;margin-bottom:14px}
+        .siperpus-login-logos img{object-fit:contain;background:#fff;border-radius:12px;padding:3px;width:56px;height:56px}
+        .siperpus-login-logos .school{width:64px;height:64px}
+        .siperpus-login-logos .bogor{width:52px;height:52px}
+        .siperpus-school-caption{text-align:center;color:#C97F1E;font-size:12px;font-weight:800;letter-spacing:.08em;margin:-2px 0 7px}
+        .sidebar-brand .mark{display:none!important}
+        .siperpus-side-logos{display:flex;align-items:center;gap:5px;flex-shrink:0}
+        .siperpus-side-logos img{object-fit:contain;background:#fff;border-radius:6px;padding:2px;width:28px;height:28px}
+        .siperpus-side-logos .school{width:34px;height:34px}
+        .siperpus-side-logos .bogor{width:27px;height:27px}
+        .sidebar-brand .name small:first-of-type{color:#F0C477;font-weight:700}
+      `;
+      d.head.appendChild(style);
 
-<!-- ================= LOGIN VIEW ================= -->
-<div id="login-view">
-  <div class="login-card">
-    <div class="login-mark">
-      <svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="1.8"><path d="M4 5.5C4 4.7 4.7 4 5.5 4H11v16H5.5A1.5 1.5 0 0 1 4 18.5v-13Z"/><path d="M20 5.5c0-.8-.7-1.5-1.5-1.5H13v16h5.5c.8 0 1.5-.7 1.5-1.5v-13Z"/></svg>
-    </div>
-    <h1>SIPERPUS SD</h1>
-    <p class="sub">Masuk untuk mengelola perpustakaan sekolah.</p>
-    <div class="login-error" id="login-error"></div>
-    <form id="login-form">
-      <div class="field">
-        <label for="login-username">Username</label>
-        <input type="text" id="login-username" autocomplete="username" required>
-      </div>
-      <div class="field">
-        <label for="login-password">Password</label>
-        <input type="password" id="login-password" autocomplete="current-password" required>
-      </div>
-      <button type="submit" class="btn btn-primary" id="login-submit">Masuk</button>
-    </form>
-    <div class="login-foot">Sistem Informasi Perpustakaan Sekolah Dasar</div>
-  </div>
-</div>
-
-<!-- ================= APP VIEW ================= -->
-<div id="app-view">
-  <div class="shell">
-    <div class="sidebar-backdrop" id="sidebar-backdrop"></div>
-    <aside class="sidebar" id="sidebar">
-      <div class="sidebar-brand">
-        <div class="mark">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 5.5C4 4.7 4.7 4 5.5 4H11v16H5.5A1.5 1.5 0 0 1 4 18.5v-13Z"/><path d="M20 5.5c0-.8-.7-1.5-1.5-1.5H13v16h5.5c.8 0 1.5-.7 1.5-1.5v-13Z"/></svg>
-        </div>
-        <div class="name">SIPERPUS SD<small>Perpustakaan Sekolah</small></div>
-      </div>
-      <ul class="nav-list">
-        <li><button class="nav-link" data-page="dashboard"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="9" rx="1.5"/><rect x="14" y="3" width="7" height="5" rx="1.5"/><rect x="14" y="12" width="7" height="9" rx="1.5"/><rect x="3" y="16" width="7" height="5" rx="1.5"/></svg>Dashboard</button></li>
-        <li><button class="nav-link" data-page="buku"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 5.5C4 4.7 4.7 4 5.5 4H11v16H5.5A1.5 1.5 0 0 1 4 18.5v-13Z"/><path d="M20 5.5c0-.8-.7-1.5-1.5-1.5H13v16h5.5c.8 0 1.5-.7 1.5-1.5v-13Z"/></svg>Data Buku</button></li>
-        <li><button class="nav-link" data-page="anggota"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="9" cy="8" r="3.2"/><path d="M2.5 20c0-3.6 2.9-6.2 6.5-6.2s6.5 2.6 6.5 6.2"/><circle cx="17.5" cy="8.5" r="2.6"/><path d="M15.8 13.9c2.9.3 5.2 2.6 5.2 5.8"/></svg>Anggota</button></li>
-        <li><button class="nav-link" data-page="transaksi"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M7 7h13M7 12h13M7 17h13"/><path d="M3 7h.01M3 12h.01M3 17h.01"/></svg>Transaksi</button></li>
-      </ul>
-      <div class="sidebar-user">
-        <div class="who" id="sidebar-username">-</div>
-        <div class="role" id="sidebar-role">-</div>
-        <button class="logout-btn" id="logout-btn">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="15" height="15"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><path d="M16 17l5-5-5-5"/><path d="M21 12H9"/></svg>
-          Keluar
-        </button>
-      </div>
-    </aside>
-
-    <div class="main">
-      <div class="topbar">
-        <button class="hamburger" id="hamburger-btn" aria-label="Buka menu">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18M3 12h18M3 18h18"/></svg>
-        </button>
-        <div class="topbar-brand">SIPERPUS SD</div>
-        <div style="width:38px;"></div>
-      </div>
-
-      <div class="content">
-
-        <!-- DASHBOARD -->
-        <section class="page" id="page-dashboard">
-          <div class="page-head">
-            <div>
-              <h2 id="dashboard-greeting">Selamat datang</h2>
-              <p>Ringkasan perpustakaan hari ini.</p>
-            </div>
-          </div>
-
-          <div class="stat-grid">
-            <div class="stat-card">
-              <div class="label"><span class="icon icon-navy"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 5.5C4 4.7 4.7 4 5.5 4H11v16H5.5A1.5 1.5 0 0 1 4 18.5v-13Z"/><path d="M20 5.5c0-.8-.7-1.5-1.5-1.5H13v16h5.5c.8 0 1.5-.7 1.5-1.5v-13Z"/></svg></span>Total Buku</div>
-              <div class="value" id="stat-total-buku">–</div>
-            </div>
-            <div class="stat-card">
-              <div class="label"><span class="icon icon-gold"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="9" cy="8" r="3.2"/><path d="M2.5 20c0-3.6 2.9-6.2 6.5-6.2s6.5 2.6 6.5 6.2"/></svg></span>Total Anggota</div>
-              <div class="value" id="stat-total-anggota">–</div>
-            </div>
-            <div class="stat-card">
-              <div class="label"><span class="icon icon-green"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2Z"/></svg></span>Sedang Dipinjam</div>
-              <div class="value" id="stat-dipinjam">–</div>
-            </div>
-            <div class="stat-card">
-              <div class="label"><span class="icon icon-red"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 7v6l4 2"/></svg></span>Buku Terlambat</div>
-              <div class="value" id="stat-terlambat">–</div>
-            </div>
-          </div>
-
-          <div class="quick-actions">
-            <button class="btn btn-gold btn-sm" data-quick="tambah-buku">+ Tambah Buku</button>
-            <button class="btn btn-ghost btn-sm" data-quick="tambah-anggota">+ Tambah Anggota</button>
-            <button class="btn btn-ghost btn-sm" data-quick="pinjam">+ Catat Peminjaman</button>
-          </div>
-
-          <div class="panel">
-            <div class="panel-head"><h3>Transaksi Terbaru</h3></div>
-            <div class="table-wrap">
-              <table>
-                <thead><tr>
-                  <th>Kode</th><th>Anggota</th><th>Buku</th><th>Tgl Pinjam</th><th>Status</th>
-                </tr></thead>
-                <tbody id="dashboard-recent-body"></tbody>
-              </table>
-            </div>
-          </div>
-        </section>
-
-        <!-- DATA BUKU -->
-        <section class="page" id="page-buku">
-          <div class="page-head">
-            <div><h2>Data Buku</h2><p>Kelola koleksi buku perpustakaan.</p></div>
-            <button class="btn btn-gold" id="btn-tambah-buku">+ Tambah Buku</button>
-          </div>
-          <div class="toolbar">
-            <div class="search-box">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg>
-              <input type="text" id="search-buku" placeholder="Cari judul, penulis, atau kode...">
-            </div>
-          </div>
-          <div class="panel">
-            <div class="table-wrap">
-              <table>
-                <thead><tr>
-                  <th>Buku</th><th>Kategori</th><th>Kelas</th><th>Rak</th><th>Stok</th><th>Tersedia</th><th>Kondisi</th><th></th>
-                </tr></thead>
-                <tbody id="buku-table-body"></tbody>
-              </table>
-            </div>
-          </div>
-        </section>
-
-        <!-- ANGGOTA -->
-        <section class="page" id="page-anggota">
-          <div class="page-head">
-            <div><h2>Anggota</h2><p>Data siswa dan anggota perpustakaan.</p></div>
-            <button class="btn btn-gold" id="btn-tambah-anggota">+ Tambah Anggota</button>
-          </div>
-          <div class="toolbar">
-            <div class="search-box">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg>
-              <input type="text" id="search-anggota" placeholder="Cari nama, kode, atau NIS...">
-            </div>
-          </div>
-          <div class="panel">
-            <div class="table-wrap">
-              <table>
-                <thead><tr>
-                  <th>Anggota</th><th>Jenis</th><th>Kelas</th><th>NIS/NIP</th><th>No. HP</th><th></th>
-                </tr></thead>
-                <tbody id="anggota-table-body"></tbody>
-              </table>
-            </div>
-          </div>
-        </section>
-
-        <!-- TRANSAKSI -->
-        <section class="page" id="page-transaksi">
-          <div class="page-head">
-            <div><h2>Transaksi</h2><p>Peminjaman dan pengembalian buku.</p></div>
-            <button class="btn btn-gold" id="btn-catat-pinjam">+ Catat Peminjaman</button>
-          </div>
-          <div class="toolbar">
-            <div class="search-box">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg>
-              <input type="text" id="search-transaksi" placeholder="Cari kode, anggota, atau buku...">
-            </div>
-          </div>
-          <div class="panel">
-            <div class="table-wrap">
-              <table>
-                <thead><tr>
-                  <th>Kode</th><th>Anggota</th><th>Buku</th><th>Pinjam</th><th>Jatuh Tempo</th><th>Status</th><th>Denda</th><th></th>
-                </tr></thead>
-                <tbody id="transaksi-table-body"></tbody>
-              </table>
-            </div>
-          </div>
-        </section>
-
-      </div>
-    </div>
-  </div>
-</div>
-
-<!-- ================= MODALS ================= -->
-
-<!-- Modal Buku -->
-<div class="modal-overlay" id="modal-buku">
-  <div class="modal">
-    <div class="modal-head"><h3 id="modal-buku-title">Tambah Buku</h3><button class="modal-close" data-close="modal-buku"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6 6 18M6 6l12 12"/></svg></button></div>
-    <div class="modal-body">
-      <form id="form-buku">
-        <input type="hidden" id="buku-id">
-        <div class="form-row">
-          <div class="field"><label>Kode Buku *</label><input type="text" id="buku-code" required></div>
-          <div class="field"><label>ISBN</label><input type="text" id="buku-isbn"></div>
-        </div>
-        <div class="field"><label>Judul *</label><input type="text" id="buku-title" required></div>
-        <div class="form-row">
-          <div class="field"><label>Penulis</label><input type="text" id="buku-author"></div>
-          <div class="field"><label>Penerbit</label><input type="text" id="buku-publisher"></div>
-        </div>
-        <div class="form-row">
-          <div class="field"><label>Tahun Terbit</label><input type="number" id="buku-year" min="1900" max="2100"></div>
-          <div class="field"><label>Kategori</label><input type="text" id="buku-category"></div>
-        </div>
-        <div class="form-row">
-          <div class="field"><label>Kelas</label><input type="text" id="buku-class-level" placeholder="mis. 1-6 / Umum"></div>
-          <div class="field"><label>Rak</label><input type="text" id="buku-rack"></div>
-        </div>
-        <div class="form-row">
-          <div class="field"><label>Stok *</label><input type="number" id="buku-stock" min="0" required></div>
-          <div class="field">
-            <label>Kondisi</label>
-            <select id="buku-condition">
-              <option>Baik</option><option>Rusak Ringan</option><option>Rusak Berat</option>
-            </select>
-          </div>
-        </div>
-        <p class="field-hint">Jumlah tersedia otomatis mengikuti stok saat buku ditambahkan, dan berubah otomatis saat ada peminjaman/pengembalian.</p>
-      </form>
-    </div>
-    <div class="modal-foot">
-      <button class="btn btn-ghost" data-close="modal-buku">Batal</button>
-      <button class="btn btn-primary" id="save-buku-btn">Simpan</button>
-    </div>
-  </div>
-</div>
-
-<!-- Modal Anggota -->
-<div class="modal-overlay" id="modal-anggota">
-  <div class="modal">
-    <div class="modal-head"><h3 id="modal-anggota-title">Tambah Anggota</h3><button class="modal-close" data-close="modal-anggota"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6 6 18M6 6l12 12"/></svg></button></div>
-    <div class="modal-body">
-      <form id="form-anggota">
-        <input type="hidden" id="anggota-id">
-        <div class="form-row">
-          <div class="field"><label>Kode Anggota *</label><input type="text" id="anggota-code" required></div>
-          <div class="field">
-            <label>Jenis Anggota</label>
-            <select id="anggota-type">
-              <option value="siswa">Siswa</option><option value="guru">Guru</option><option value="staf">Staf</option>
-            </select>
-          </div>
-        </div>
-        <div class="field"><label>Nama *</label><input type="text" id="anggota-name" required></div>
-        <div class="form-row">
-          <div class="field"><label>Kelas</label><input type="text" id="anggota-class"></div>
-          <div class="field"><label>NIS/NIP</label><input type="text" id="anggota-nis"></div>
-        </div>
-        <div class="field"><label>No. HP</label><input type="text" id="anggota-phone"></div>
-      </form>
-    </div>
-    <div class="modal-foot">
-      <button class="btn btn-ghost" data-close="modal-anggota">Batal</button>
-      <button class="btn btn-primary" id="save-anggota-btn">Simpan</button>
-    </div>
-  </div>
-</div>
-
-<!-- Modal Peminjaman -->
-<div class="modal-overlay" id="modal-pinjam">
-  <div class="modal">
-    <div class="modal-head"><h3>Catat Peminjaman</h3><button class="modal-close" data-close="modal-pinjam"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6 6 18M6 6l12 12"/></svg></button></div>
-    <div class="modal-body">
-      <form id="form-pinjam">
-        <div class="field">
-          <label>Anggota *</label>
-          <select id="pinjam-member" required><option value="">Pilih anggota...</option></select>
-        </div>
-        <div class="field">
-          <label>Buku *</label>
-          <select id="pinjam-book" required><option value="">Pilih buku...</option></select>
-        </div>
-        <div class="form-row">
-          <div class="field"><label>Tanggal Pinjam *</label><input type="date" id="pinjam-borrow-date" required></div>
-          <div class="field"><label>Jatuh Tempo *</label><input type="date" id="pinjam-due-date" required></div>
-        </div>
-      </form>
-    </div>
-    <div class="modal-foot">
-      <button class="btn btn-ghost" data-close="modal-pinjam">Batal</button>
-      <button class="btn btn-primary" id="save-pinjam-btn">Simpan Peminjaman</button>
-    </div>
-  </div>
-</div>
-
-<!-- Modal Pengembalian -->
-<div class="modal-overlay" id="modal-kembali">
-  <div class="modal" style="max-width:400px;">
-    <div class="modal-head"><h3>Pengembalian Buku</h3><button class="modal-close" data-close="modal-kembali"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6 6 18M6 6l12 12"/></svg></button></div>
-    <div class="modal-body">
-      <p id="kembali-info" style="margin:0 0 10px;font-size:14px;color:var(--text-soft);"></p>
-      <p class="field-hint" style="margin:0;">Denda keterlambatan dihitung otomatis oleh sistem berdasarkan tanggal jatuh tempo.</p>
-    </div>
-    <div class="modal-foot">
-      <button class="btn btn-ghost" data-close="modal-kembali">Batal</button>
-      <button class="btn btn-primary" id="save-kembali-btn">Konfirmasi Kembali</button>
-    </div>
-  </div>
-</div>
-
-<div id="toast-container"></div>
-
-<script src="app.js"></script>
+      const loginMark=d.querySelector('.login-mark');
+      if(loginMark){
+        const wrap=d.createElement('div');
+        wrap.className='siperpus-login-logos';
+        wrap.innerHTML='<img class="school" src="'+school+'" alt="Logo SDN Muarasari 1"><img class="bogor" src="'+bogor+'" alt="Logo Kota Bogor">';
+        loginMark.parentNode.insertBefore(wrap,loginMark);
+      }
+      const loginTitle=d.querySelector('.login-card h1');
+      if(loginTitle){
+        const cap=d.createElement('div');
+        cap.className='siperpus-school-caption';
+        cap.textContent='SDN MUARASARI 1';
+        loginTitle.parentNode.insertBefore(cap,loginTitle.nextSibling);
+      }
+      const brand=d.querySelector('.sidebar-brand');
+      if(brand){
+        const mark=brand.querySelector('.mark');
+        const logos=d.createElement('div');
+        logos.className='siperpus-side-logos';
+        logos.innerHTML='<img class="school" src="'+school+'" alt="Logo SDN Muarasari 1"><img class="bogor" src="'+bogor+'" alt="Logo Kota Bogor">';
+        if(mark) mark.parentNode.insertBefore(logos,mark);
+        const name=brand.querySelector('.name');
+        if(name){
+          const first=name.querySelector('small');
+          if(first){first.textContent='SDN MUARASARI 1';}
+          const second=d.createElement('small');
+          second.textContent='Perpustakaan Sekolah';
+          name.appendChild(second);
+        }
+      }
+    }catch(e){console.warn('Branding SIPERPUS belum dapat diterapkan:',e)}
+  }
+  frame.addEventListener('load',applyBranding);
+})();
+</script>
 </body>
 </html>
