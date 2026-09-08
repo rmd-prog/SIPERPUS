@@ -237,18 +237,27 @@ async function loadDashboard() {
   try {
     const data = await apiFetch("/api/dashboard");
 
-    document.getElementById("stat-total-buku").textContent = data.total_books ?? data.totalBooks ?? "0";
-    document.getElementById("stat-total-anggota").textContent = data.total_members ?? data.totalMembers ?? "0";
-    document.getElementById("stat-dipinjam").textContent = data.borrowed_count ?? data.borrowedCount ?? "0";
-    document.getElementById("stat-terlambat").textContent = data.overdue_count ?? data.overdueCount ?? "0";
+    document.getElementById("stat-total-buku").textContent = data.books ?? "0";
+    document.getElementById("stat-total-anggota").textContent = data.members ?? "0";
+    document.getElementById("stat-dipinjam").textContent = data.borrowed ?? "0";
+    document.getElementById("stat-terlambat").textContent = data.late ?? "0";
+  } catch (err) {
+    if (err.message !== "Unauthorized") {
+      showToast("Gagal memuat ringkasan dashboard: " + err.message, "error");
+    }
+  }
 
-    const recent = data.recent_transactions || data.recentTransactions || [];
-    if (!recent.length) {
+  try {
+    const txData = await apiFetch("/api/transactions");
+    const list = (Array.isArray(txData) ? txData : txData.transactions || txData.data || []).slice(0, 5);
+    state.transactions = Array.isArray(txData) ? txData : txData.transactions || txData.data || [];
+
+    if (!list.length) {
       body.innerHTML = '<tr><td colspan="5"><div class="empty-state"><p>Belum ada transaksi.</p></div></td></tr>';
       return;
     }
 
-    body.innerHTML = recent
+    body.innerHTML = list
       .map(
         (tx) => `
       <tr>
@@ -262,7 +271,7 @@ async function loadDashboard() {
       .join("");
   } catch (err) {
     if (err.message !== "Unauthorized") {
-      body.innerHTML = '<tr><td colspan="5"><div class="empty-state"><p>Gagal memuat dashboard: ' + escapeHtml(err.message) + "</p></div></td></tr>";
+      body.innerHTML = '<tr><td colspan="5"><div class="empty-state"><p>Gagal memuat transaksi terbaru: ' + escapeHtml(err.message) + "</p></div></td></tr>";
     }
   }
 }
@@ -595,23 +604,22 @@ let pendingReturnTx = null;
 
 function openKembaliModal(tx) {
   pendingReturnTx = tx;
-  document.getElementById("kembali-info").textContent = `${tx.book_title || tx.book || "Buku"} — dipinjam oleh ${tx.member_name || tx.member || "-"}`;
-  document.getElementById("kembali-fine").value = 0;
+  document.getElementById("kembali-info").textContent = `${tx.book_title || tx.book || "Buku"} — dipinjam oleh ${tx.member_name || tx.member || "-"}. Jatuh tempo ${formatDate(tx.due_date)}.`;
   openModal("modal-kembali");
 }
 
 async function saveKembali() {
   if (!pendingReturnTx) return;
-  const fine = Number(document.getElementById("kembali-fine").value || 0);
   const btn = document.getElementById("save-kembali-btn");
   btn.disabled = true;
   btn.textContent = "Memproses...";
   try {
-    await apiFetch(`/api/transactions/${pendingReturnTx.id}/return`, {
+    const result = await apiFetch(`/api/transactions/${pendingReturnTx.id}/return`, {
       method: "POST",
-      body: JSON.stringify({ return_date: todayISO(), fine }),
+      body: JSON.stringify({}),
     });
-    showToast("Buku berhasil dikembalikan.", "success");
+    const fineMsg = result && result.fine ? ` Denda: ${formatCurrency(result.fine)}.` : "";
+    showToast("Buku berhasil dikembalikan." + fineMsg, "success");
     closeModal("modal-kembali");
     pendingReturnTx = null;
     loadTransactions();
