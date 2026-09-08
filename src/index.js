@@ -122,6 +122,7 @@ export default {
       }
 
       const bookMatch = path.match(/^\/api\/books\/(\d+)$/);
+      if (bookMatch && request.method === 'DELETE') { const id=Number(bookMatch[1]); const h=await env.DB.prepare('SELECT COUNT(*) AS n FROM transactions WHERE book_id=?').bind(id).first(); if(Number(h?.n||0)>0)return json({error:'Buku memiliki riwayat transaksi.'},409,origin); await env.DB.prepare('DELETE FROM books WHERE id=?').bind(id).run(); return json({ok:true},200,origin); }
       if (bookMatch && request.method === 'PUT') {
         const id = Number(bookMatch[1]), x = await body(request);
         const old = await env.DB.prepare('SELECT stock,available FROM books WHERE id=?').bind(id).first();
@@ -152,6 +153,7 @@ export default {
       }
 
       const memberMatch = path.match(/^\/api\/members\/(\d+)$/);
+      if (memberMatch && request.method === 'DELETE') { const id=Number(memberMatch[1]); const h=await env.DB.prepare('SELECT COUNT(*) AS n FROM transactions WHERE member_id=?').bind(id).first(); if(Number(h?.n||0)>0)return json({error:'Anggota memiliki riwayat transaksi.'},409,origin); await env.DB.prepare('DELETE FROM members WHERE id=?').bind(id).run(); return json({ok:true},200,origin); }
       if (memberMatch && request.method === 'PUT') {
         const id = Number(memberMatch[1]), x = await body(request);
         if (!await env.DB.prepare('SELECT id FROM members WHERE id=?').bind(id).first()) return json({ error: 'Anggota tidak ditemukan.' }, 404, origin);
@@ -182,6 +184,9 @@ export default {
         ]);
         return json({ ok: true, transaction_code: code }, 201, origin);
       }
+
+      const transactionMatch = path.match(/^\/api\/transactions\/(\d+)$/);
+      if (transactionMatch && request.method === 'DELETE') { const id=Number(transactionMatch[1]); const t=await env.DB.prepare('SELECT book_id,status FROM transactions WHERE id=?').bind(id).first(); if(!t)return json({error:'Transaksi tidak ditemukan.'},404,origin); if(t.status==='borrowed'){ await env.DB.batch([env.DB.prepare('DELETE FROM transactions WHERE id=?').bind(id),env.DB.prepare('UPDATE books SET available=MIN(stock,available+1) WHERE id=?').bind(t.book_id)]); } else { await env.DB.prepare('DELETE FROM transactions WHERE id=?').bind(id).run(); } return json({ok:true},200,origin); }
 
       const returnMatch = path.match(/^\/api\/transactions\/(\d+)\/return$/);
       if (returnMatch && request.method === 'POST') {
