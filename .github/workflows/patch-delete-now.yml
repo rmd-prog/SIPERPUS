@@ -1,9 +1,12 @@
 name: Patch delete functions
-on: workflow_dispatch
+on:
+  push:
+    branches: [main]
 permissions:
   contents: write
 jobs:
   patch:
+    if: github.actor != 'github-actions[bot]'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -23,7 +26,7 @@ jobs:
           add=marker+"\n      if (memberMatch && request.method === 'DELETE') { const id=Number(memberMatch[1]); const h=await env.DB.prepare('SELECT COUNT(*) AS n FROM transactions WHERE member_id=?').bind(id).first(); if(Number(h?.n||0)>0)return json({error:'Anggota memiliki riwayat transaksi.'},409,origin); await env.DB.prepare('DELETE FROM members WHERE id=?').bind(id).run(); return json({ok:true},200,origin); }"
           s=s.replace(marker,add,1)
           marker="const returnMatch = path.match(/^\\/api\\/transactions\\/(\\d+)\\/return$/);"
-          add="const transactionMatch = path.match(/^\\/api\\/transactions\\/(\\d+)$/);\n      if (transactionMatch && request.method === 'DELETE') { const id=Number(transactionMatch[1]); const t=await env.DB.prepare('SELECT book_id,status FROM transactions WHERE id=?').bind(id).first(); if(!t)return json({error:'Transaksi tidak ditemukan.'},404,origin); await env.DB.prepare('DELETE FROM transactions WHERE id=?').bind(id).run(); if(t.status==='borrowed') await env.DB.prepare('UPDATE books SET available=MIN(stock,available+1) WHERE id=?').bind(t.book_id).run(); return json({ok:true},200,origin); }\n\n      "+marker
+          add="const transactionMatch = path.match(/^\\/api\\/transactions\\/(\\d+)$/);\n      if (transactionMatch && request.method === 'DELETE') { const id=Number(transactionMatch[1]); const t=await env.DB.prepare('SELECT book_id,status FROM transactions WHERE id=?').bind(id).first(); if(!t)return json({error:'Transaksi tidak ditemukan.'},404,origin); if(t.status==='borrowed'){ await env.DB.batch([env.DB.prepare('DELETE FROM transactions WHERE id=?').bind(id),env.DB.prepare('UPDATE books SET available=MIN(stock,available+1) WHERE id=?').bind(t.book_id)]); } else { await env.DB.prepare('DELETE FROM transactions WHERE id=?').bind(id).run(); } return json({ok:true},200,origin); }\n\n      "+marker
           s=s.replace(marker,add,1)
           p.write_text(s)
           PY
