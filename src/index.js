@@ -4,7 +4,7 @@ const json = (data, status = 200, origin = '*') => new Response(JSON.stringify(d
     'content-type': 'application/json; charset=utf-8',
     'access-control-allow-origin': origin,
     'access-control-allow-methods': 'GET,POST,PUT,DELETE,OPTIONS',
-    'access-control-allow-headers': 'Content-Type, Authorization'
+    'access-control-allow-headers': 'Content-Type, Authorization, X-Setup-Key'
   }
 });
 
@@ -37,7 +37,7 @@ export default {
       headers: {
         'access-control-allow-origin': origin,
         'access-control-allow-methods': 'GET,POST,PUT,DELETE,OPTIONS',
-        'access-control-allow-headers': 'Content-Type, Authorization'
+        'access-control-allow-headers': 'Content-Type, Authorization, X-Setup-Key'
       }
     });
 
@@ -108,7 +108,9 @@ export default {
         const old = await env.DB.prepare('SELECT stock,available FROM books WHERE id=?').bind(Number(bookMatch[1])).first();
         if (!old) return json({ error: 'Buku tidak ditemukan.' }, 404, origin);
         const stock = Math.max(0, Number(x.stock ?? old.stock));
-        const available = Math.max(0, Number(old.available || 0) + stock - Number(old.stock || 0));
+        const borrowed = Math.max(0, Number(old.stock || 0) - Number(old.available || 0));
+        if (stock < borrowed) return json({ error: `Stok tidak boleh kurang dari jumlah buku yang sedang dipinjam (${borrowed}).` }, 400, origin);
+        const available = stock - borrowed;
         await env.DB.prepare(`UPDATE books SET code=?,isbn=?,title=?,author=?,publisher=?,year=?,category=?,class_level=?,rack=?,stock=?,available=?,cover=?,condition=? WHERE id=?`)
           .bind(x.code,x.isbn||null,x.title,x.author||null,x.publisher||null,x.year?Number(x.year):null,x.category||null,x.class_level||null,x.rack||null,stock,available,x.cover||null,x.condition||'Baik',Number(bookMatch[1])).run();
         return json({ ok: true }, 200, origin);
@@ -146,6 +148,7 @@ export default {
 
       if (path === '/api/transactions/borrow' && request.method === 'POST') {
         const x = await body(request);
+        if (!x.member_id || !x.book_id || !x.due_date) return json({ error: 'Anggota, buku, dan tanggal jatuh tempo wajib diisi.' }, 400, origin);
         const member = await env.DB.prepare('SELECT id,name FROM members WHERE id=? AND active=1').bind(Number(x.member_id)).first();
         const book = await env.DB.prepare('SELECT id,title,available FROM books WHERE id=?').bind(Number(x.book_id)).first();
         if (!member || !book) return json({ error: 'Anggota atau buku tidak ditemukan.' }, 404, origin);
