@@ -1,0 +1,80 @@
+<!doctype html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>SIPERPUS SD V1</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div id="loginPage" class="login-page">
+    <div class="login-card">
+      <div class="logo">📚</div>
+      <h1>SIPERPUS SD</h1>
+      <p>Sistem Perpustakaan Sekolah — V1</p>
+      <form id="loginForm">
+        <label>Username</label>
+        <input id="username" required autocomplete="username" placeholder="admin">
+        <label>Password</label>
+        <input id="password" type="password" required autocomplete="current-password" placeholder="••••••••">
+        <button type="submit">Masuk</button>
+        <div id="loginError" class="error"></div>
+      </form>
+    </div>
+  </div>
+
+  <div id="app" class="app hidden">
+    <aside class="sidebar">
+      <div class="brand"><span>📚</span><b>SIPERPUS SD</b></div>
+      <nav>
+        <button class="nav active" data-page="dashboard">🏠 Dashboard</button>
+        <button class="nav" data-page="books">📚 Data Buku</button>
+        <button class="nav" data-page="members">👥 Anggota</button>
+        <button class="nav" data-page="transactions">🔄 Transaksi</button>
+      </nav>
+      <button id="logoutBtn" class="logout">🚪 Keluar</button>
+    </aside>
+
+    <main class="main">
+      <header class="topbar">
+        <div>
+          <h2 id="pageTitle">Dashboard</h2>
+          <small id="today"></small>
+        </div>
+        <div class="user">👤 <span id="userName">Admin</span></div>
+      </header>
+
+      <section id="page-dashboard" class="page">
+        <div class="stats">
+          <div class="stat"><span>📚</span><small>Total Buku</small><strong id="statBooks">0</strong></div>
+          <div class="stat"><span>👥</span><small>Total Anggota</small><strong id="statMembers">0</strong></div>
+          <div class="stat"><span>📖</span><small>Sedang Dipinjam</small><strong id="statBorrowed">0</strong></div>
+          <div class="stat"><span>⏰</span><small>Terlambat</small><strong id="statLate">0</strong></div>
+        </div>
+        <div class="grid2">
+          <div class="panel"><h3>Transaksi Terbaru</h3><div id="recentTransactions" class="empty">Belum ada transaksi.</div></div>
+          <div class="panel"><h3>Informasi Sistem</h3><p>Selamat datang di SIPERPUS SD V1.</p><p>Versi ini menggunakan penyimpanan lokal sebagai mode demo. Backend Cloudflare Worker + D1 disiapkan di <code>schema.sql</code>.</p></div>
+        </div>
+      </section>
+
+      <section id="page-books" class="page hidden">
+        <div class="toolbar"><input id="bookSearch" placeholder="🔎 Cari judul, kode, pengarang..."><button id="addBookBtn">＋ Tambah Buku</button></div>
+        <div class="panel table-wrap"><table><thead><tr><th>Kode</th><th>Judul</th><th>Pengarang</th><th>Kategori</th><th>Kelas</th><th>Stok</th><th>Aksi</th></tr></thead><tbody id="booksTable"></tbody></table></div>
+      </section>
+
+      <section id="page-members" class="page hidden">
+        <div class="toolbar"><input id="memberSearch" placeholder="🔎 Cari nama / nomor anggota..."><button id="addMemberBtn">＋ Tambah Anggota</button></div>
+        <div class="panel table-wrap"><table><thead><tr><th>No. Anggota</th><th>Nama</th><th>Tipe</th><th>Kelas</th><th>NIS</th><th>Status</th><th>Aksi</th></tr></thead><tbody id="membersTable"></tbody></table></div>
+      </section>
+
+      <section id="page-transactions" class="page hidden">
+        <div class="transaction-actions"><button id="borrowBtn">📖 Peminjaman</button><button id="returnBtn" class="secondary">↩️ Pengembalian</button></div>
+        <div class="panel table-wrap"><table><thead><tr><th>Transaksi</th><th>Anggota</th><th>Buku</th><th>Pinjam</th><th>Jatuh Tempo</th><th>Kembali</th><th>Status</th></tr></thead><tbody id="transactionsTable"></tbody></table></div>
+      </section>
+    </main>
+  </div>
+
+  <div id="modal" class="modal hidden"><div class="modal-card"><button class="close" id="closeModal">×</button><h3 id="modalTitle"></h3><form id="modalForm"></form></div></div>
+  <script src="app.js"></script>
+</body>
+</html>
