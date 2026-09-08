@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>SIPERPUS — Setup Admin</title>
+<style>
+*{box-sizing:border-box}body{margin:0;min-height:100vh;font-family:Inter,Arial,sans-serif;background:linear-gradient(135deg,#132A45,#1E3A5F);display:flex;align-items:center;justify-content:center;padding:20px;color:#1B1E24}.card{width:100%;max-width:430px;background:#fff;border-radius:18px;padding:30px;box-shadow:0 20px 60px #0005}.logo{width:52px;height:52px;border-radius:14px;background:#E8A33D;display:grid;place-items:center;font-size:26px;margin-bottom:18px}.logo:before{content:'📚'}h1{margin:0 0 7px;font-size:25px;color:#132A45}p{color:#666B74;font-size:14px;line-height:1.55}.notice{background:#FFF7E8;border:1px solid #F0D39A;padding:12px;border-radius:10px;font-size:13px;margin:18px 0}.field{margin:14px 0}.field label{display:block;font-size:13px;font-weight:700;margin-bottom:6px}.field input{width:100%;padding:12px;border:1.5px solid #E4E2DB;border-radius:9px;font-size:14px}.field input:focus{outline:none;border-color:#1E3A5F}.btn{width:100%;border:0;border-radius:9px;padding:13px;background:#1E3A5F;color:white;font-weight:700;font-size:14px;cursor:pointer}.btn:disabled{opacity:.6}.result{display:none;margin-top:16px;padding:12px;border-radius:9px;font-size:13px;line-height:1.5}.ok{display:block;background:#E7F5EC;color:#276749}.err{display:block;background:#FBEAE8;color:#A8322B}.links{text-align:center;margin-top:18px;font-size:13px}.links a{color:#1E3A5F;font-weight:700;text-decoration:none}.small{font-size:12px;color:#888;margin-top:16px}
+</style>
+</head>
+<body>
+<main class="card">
+<div class="logo"></div>
+<h1>Setup Administrator</h1>
+<p>Buat akun admin SIPERPUS langsung dari browser. Halaman ini hanya dapat membuat akun ketika database belum memiliki pengguna.</p>
+<div class="notice"><b>Keamanan:</b> Setup Key adalah secret Cloudflare. Jangan membagikannya atau memasukkannya ke kode GitHub.</div>
+<form id="form">
+<div class="field"><label for="setupKey">Setup Key</label><input id="setupKey" type="password" autocomplete="off" required placeholder="Masukkan SETUP_KEY"></div>
+<div class="field"><label for="username">Username Admin</label><input id="username" value="admin" maxlength="100" required></div>
+<div class="field"><label for="name">Nama</label><input id="name" value="Administrator" maxlength="150" required></div>
+<div class="field"><label for="password">Password</label><input id="password" type="password" minlength="8" required placeholder="Minimal 8 karakter"></div>
+<div class="field"><label for="password2">Ulangi Password</label><input id="password2" type="password" minlength="8" required></div>
+<button class="btn" id="submit">Buat Akun Admin</button>
+</form>
+<div id="result" class="result"></div>
+<div class="links"><a href="./">← Kembali ke SIPERPUS</a></div>
+<div class="small">SIPERPUS SD • Cloudflare Worker + D1</div>
+</main>
+<script>
+const API='https://siperpus.adm-sd.workers.dev';
+const form=document.getElementById('form'),btn=document.getElementById('submit'),result=document.getElementById('result');
+form.addEventListener('submit',async e=>{
+ e.preventDefault(); result.className='result'; result.textContent='';
+ const key=document.getElementById('setupKey').value, username=document.getElementById('username').value.trim(), name=document.getElementById('name').value.trim(), password=document.getElementById('password').value, password2=document.getElementById('password2').value;
+ if(password!==password2){result.className='result err';result.textContent='Password dan konfirmasi password tidak sama.';return}
+ if(password.length<8){result.className='result err';result.textContent='Password minimal 8 karakter.';return}
+ btn.disabled=true;btn.textContent='Membuat akun...';
+ try{
+  const res=await fetch(API+'/api/setup-admin',{method:'POST',headers:{'Content-Type':'application/json','X-Setup-Key':key},body:JSON.stringify({username,name,password})});
+  const text=await res.text();let data={};try{data=JSON.parse(text)}catch{}
+  if(!res.ok) throw new Error(data.error||'Setup gagal ('+res.status+').');
+  result.className='result ok';result.innerHTML='<b>Berhasil!</b><br>Akun admin sudah dibuat. Silakan kembali ke SIPERPUS dan login.';
+  form.reset();document.getElementById('username').value='admin';document.getElementById('name').value='Administrator';
+ }catch(err){result.className='result err';result.textContent=err.message||'Tidak dapat terhubung ke Worker.'}
+ finally{btn.disabled=false;btn.textContent='Buat Akun Admin'}
+});
+</script>
+</body>
+</html>
