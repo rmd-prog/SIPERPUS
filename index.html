@@ -107,6 +107,8 @@
   .btn-danger-outline:hover{background:var(--danger-bg);}
   .btn[disabled]{opacity:.6;pointer-events:none;}
   .btn-sm{padding:7px 12px;font-size:13px;border-radius:7px;}
+  .table-wrap tbody td:last-child{white-space:nowrap;position:relative;z-index:2;}
+  .table-wrap tbody td:last-child .btn{position:relative;z-index:3;pointer-events:auto;touch-action:manipulation;}
 
   .login-error{
     background:var(--danger-bg);color:var(--danger);font-size:13.5px;

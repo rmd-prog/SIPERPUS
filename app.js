@@ -319,7 +319,7 @@ function renderBooks(list) {
       <td>${escapeHtml(b.stock)}</td>
       <td>${escapeHtml(b.available)}</td>
       <td>${conditionBadge(b.condition)}</td>
-      <td><button class="btn btn-ghost btn-sm" data-edit-buku="${b.id}">Edit</button> <button class="btn btn-sm" style="background:#dc2626" data-delete-buku="${b.id}">Hapus</button></td>
+      <td><button class="btn btn-ghost btn-sm" data-edit-buku="${b.id}">Edit</button> <button class="btn btn-sm" style="background:#dc2626" data-delete-buku="${b.id}" type="button" onclick="deleteBuku(${b.id})">Hapus</button></td>
     </tr>`
     )
     .join("");
@@ -431,7 +431,7 @@ function renderMembers(list) {
       <td>${escapeHtml(m.class_name || "-")}</td>
       <td>${escapeHtml(m.nis || "-")}</td>
       <td>${escapeHtml(m.phone || "-")}</td>
-      <td><button class="btn btn-ghost btn-sm" data-edit-anggota="${m.id}">Edit</button> <button class="btn btn-sm" style="background:#dc2626" data-delete-anggota="${m.id}">Hapus</button></td>
+      <td><button class="btn btn-ghost btn-sm" data-edit-anggota="${m.id}">Edit</button> <button class="btn btn-sm" style="background:#dc2626" data-delete-anggota="${m.id}" type="button" onclick="deleteAnggota(${m.id})">Hapus</button></td>
     </tr>`
     )
     .join("");
@@ -572,8 +572,8 @@ function renderTransactions(list) {
       <td>${tx.fine ? formatCurrency(tx.fine) : "-"}</td>
       <td>${
         tx.status === "borrowed"
-          ? `<button class="btn btn-ghost btn-sm" data-return-tx="${tx.id}">Kembalikan</button> <button class="btn btn-sm" style="background:#dc2626" data-delete-tx="${tx.id}">Hapus</button>`
-          : `<button class="btn btn-sm" style="background:#dc2626" data-delete-tx="${tx.id}">Hapus</button>`
+          ? `<button class="btn btn-ghost btn-sm" data-return-tx="${tx.id}">Kembalikan</button> <button class="btn btn-sm" style="background:#dc2626" data-delete-tx="${tx.id}" type="button" onclick="deleteTransaksi(${tx.id})">Hapus</button>`
+          : `<button class="btn btn-sm" style="background:#dc2626" data-delete-tx="${tx.id}" type="button" onclick="deleteTransaksi(${tx.id})">Hapus</button>`
       }</td>
     </tr>`
     )
