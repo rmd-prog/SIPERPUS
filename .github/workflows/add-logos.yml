@@ -1,0 +1,89 @@
+name: Apply SIPERPUS branding
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  branding:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: Apply logos and school name
+        shell: python
+        run: |
+          from pathlib import Path
+
+          p = Path('index.html')
+          s = p.read_text(encoding='utf-8')
+
+          # Avoid re-applying the same branding on the follow-up push.
+          if 'siperpus-branding-v1' in s:
+              print('Branding already applied.')
+              raise SystemExit(0)
+
+          school = './logo%20ms%201%20proses%20%281%29.png'
+          bogor = './images.png'
+
+          s = s.replace(
+              '<div class="login-mark">\n      <svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="1.8">',
+              '<div class="login-logos">\n      <img class="school-logo" src="' + school + '" alt="Logo SDN Muarasari 1">\n      <img class="bogor-logo" src="' + bogor + '" alt="Logo Kota Bogor">\n    </div>\n    <div class="login-mark legacy-mark">\n      <svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="1.8">'
+          )
+
+          s = s.replace(
+              '    <h1>SIPERPUS SD</h1>\n    <p class="sub">',
+              '    <h1>SIPERPUS SD</h1>\n    <div class="school-caption">SDN MUARASARI 1</div>\n    <p class="sub">'
+          )
+
+          s = s.replace(
+              '    <div class="mark">\n      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">',
+              '    <div class="brand-logos">\n      <img class="school-logo" src="' + school + '" alt="Logo SDN Muarasari 1">\n      <img class="bogor-logo" src="' + bogor + '" alt="Logo Kota Bogor">\n    </div>\n    <div class="mark legacy-mark">\n      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">'
+          )
+
+          s = s.replace(
+              '<div class="name">SIPERPUS SD<small>Perpustakaan Sekolah</small></div>',
+              '<div class="name">SIPERPUS SD<small>SDN MUARASARI 1</small><small>Perpustakaan Sekolah</small></div>'
+          )
+
+          css = r'''
+  /* siperpus-branding-v1 */
+  .login-logos{display:flex;align-items:center;justify-content:center;gap:12px;margin-bottom:16px;}
+  .login-logos img{width:58px;height:58px;object-fit:contain;background:#fff;border-radius:12px;padding:3px;}
+  .login-logos .school-logo{width:64px;height:64px;}
+  .login-logos .bogor-logo{width:54px;height:54px;}
+  .legacy-mark{display:none!important;}
+  .school-caption{text-align:center;color:var(--gold-dark);font-size:12px;font-weight:800;letter-spacing:.08em;margin:-2px 0 6px;}
+  .brand-logos{display:flex;align-items:center;gap:5px;flex-shrink:0;}
+  .brand-logos img{width:30px;height:30px;object-fit:contain;border-radius:6px;background:#fff;padding:2px;}
+  .brand-logos .school-logo{width:34px;height:34px;}
+  .brand-logos .bogor-logo{width:28px;height:28px;}
+  .sidebar-brand .name small:first-of-type{color:#F0C477;font-weight:700;letter-spacing:.02em;}
+  @media(max-width:700px){
+    .login-logos img{width:52px;height:52px;}
+    .login-logos .school-logo{width:58px;height:58px;}
+  }
+  '''
+          s = s.replace('</style>', css + '\n</style>', 1)
+          p.write_text(s, encoding='utf-8')
+          print('Branding applied.')
+
+      - name: Commit branding changes
+        shell: bash
+        run: |
+          if git diff --quiet -- index.html; then
+            echo "No branding changes needed."
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add index.html
+          git commit -m "Apply SIPERPUS school branding [skip ci]"
+          git push
