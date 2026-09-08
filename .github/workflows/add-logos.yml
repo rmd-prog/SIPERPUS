@@ -10,57 +10,49 @@ permissions:
 
 jobs:
   branding:
-    if: ${{ !contains(github.event.head_commit.message, 'Apply SIPERPUS school branding') }}
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
+      - name: Apply branding through GitHub API
+        uses: actions/github-script@v7
         with:
-          fetch-depth: 1
+          script: |
+            const path = 'index.html';
+            const owner = context.repo.owner;
+            const repo = context.repo.repo;
+            const ref = 'main';
+            const school = './logo%20ms%201%20proses%20%281%29.png';
+            const bogor = './images.png';
 
-      - name: Apply logos and school name
-        shell: bash
-        run: |
-          python3 <<'PY'
-          from pathlib import Path
-          p = Path('index.html')
-          s = p.read_text(encoding='utf-8')
-          if 'siperpus-branding-v1' in s:
-              print('Branding already applied.')
-              raise SystemExit(0)
+            const file = await github.rest.repos.getContent({ owner, repo, path, ref });
+            const current = Buffer.from(file.data.content, 'base64').toString('utf8');
 
-          school = './logo%20ms%201%20proses%20%281%29.png'
-          bogor = './images.png'
+            if (current.includes('siperpus-branding-v1')) {
+              console.log('Branding already applied.');
+              return;
+            }
 
-          old = '''<div class="login-mark">
-      <svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="1.8">'''
-          new = '''<div class="login-logos">
-      <img class="school-logo" src="''' + school + '''" alt="Logo SDN Muarasari 1">
-      <img class="bogor-logo" src="''' + bogor + '''" alt="Logo Kota Bogor">
-    </div>
-    <div class="login-mark legacy-mark">
-      <svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="1.8">'''
-          s = s.replace(old, new, 1)
+            let s = current;
+            s = s.replace(
+              `<div class="login-mark">\n      <svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="1.8">`,
+              `<div class="login-logos">\n      <img class="school-logo" src="${school}" alt="Logo SDN Muarasari 1">\n      <img class="bogor-logo" src="${bogor}" alt="Logo Kota Bogor">\n    </div>\n    <div class="login-mark legacy-mark">\n      <svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="1.8">`
+            );
 
-          s = s.replace(
-              '    <h1>SIPERPUS SD</h1>\n    <p class="sub">',
-              '    <h1>SIPERPUS SD</h1>\n    <div class="school-caption">SDN MUARASARI 1</div>\n    <p class="sub">', 1)
+            s = s.replace(
+              `    <h1>SIPERPUS SD</h1>\n    <p class="sub">`,
+              `    <h1>SIPERPUS SD</h1>\n    <div class="school-caption">SDN MUARASARI 1</div>\n    <p class="sub">`
+            );
 
-          old = '''    <div class="mark">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">'''
-          new = '''    <div class="brand-logos">
-      <img class="school-logo" src="''' + school + '''" alt="Logo SDN Muarasari 1">
-      <img class="bogor-logo" src="''' + bogor + '''" alt="Logo Kota Bogor">
-    </div>
-    <div class="mark legacy-mark">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">'''
-          s = s.replace(old, new, 1)
+            s = s.replace(
+              `    <div class="mark">\n      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">`,
+              `    <div class="brand-logos">\n      <img class="school-logo" src="${school}" alt="Logo SDN Muarasari 1">\n      <img class="bogor-logo" src="${bogor}" alt="Logo Kota Bogor">\n    </div>\n    <div class="mark legacy-mark">\n      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">`
+            );
 
-          s = s.replace(
-              '<div class="name">SIPERPUS SD<small>Perpustakaan Sekolah</small></div>',
-              '<div class="name">SIPERPUS SD<small>SDN MUARASARI 1</small><small>Perpustakaan Sekolah</small></div>', 1)
+            s = s.replace(
+              `<div class="name">SIPERPUS SD<small>Perpustakaan Sekolah</small></div>`,
+              `<div class="name">SIPERPUS SD<small>SDN MUARASARI 1</small><small>Perpustakaan Sekolah</small></div>`
+            );
 
-          css = '''
+            const css = `
   /* siperpus-branding-v1 */
   .login-logos{display:flex;align-items:center;justify-content:center;gap:12px;margin-bottom:16px;}
   .login-logos img{width:58px;height:58px;object-fit:contain;background:#fff;border-radius:12px;padding:3px;}
@@ -74,21 +66,18 @@ jobs:
   .brand-logos .bogor-logo{width:28px;height:28px;}
   .sidebar-brand .name small:first-of-type{color:#F0C477;font-weight:700;letter-spacing:.02em;}
   @media(max-width:700px){.login-logos img{width:52px;height:52px;}.login-logos .school-logo{width:58px;height:58px;}}
-  '''
-          s = s.replace('</style>', css + '\n</style>', 1)
-          p.write_text(s, encoding='utf-8')
-          print('Branding applied.')
-          PY
+  `;
+            s = s.replace('</style>', css + '\n</style>', 1);
 
-      - name: Commit branding changes
-        shell: bash
-        run: |
-          if git diff --quiet -- index.html; then
-            echo "No branding changes needed."
-            exit 0
-          fi
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add index.html
-          git commit -m "Apply SIPERPUS school branding [skip ci]"
-          git push
+            if (s === current) throw new Error('Target HTML tidak ditemukan; tidak ada perubahan yang dilakukan.');
+
+            await github.rest.repos.createOrUpdateFileContents({
+              owner,
+              repo,
+              path,
+              message: 'Apply SIPERPUS school branding [skip ci]',
+              content: Buffer.from(s, 'utf8').toString('base64'),
+              sha: file.data.sha,
+              branch: ref
+            });
+            console.log('Branding applied to index.html.');
