@@ -1,0 +1,37 @@
+name: Restore SIPERPUS original index
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+
+permissions:
+  contents: write
+
+jobs:
+  restore:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Restore index.html from index-original.html
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const owner = context.repo.owner;
+            const repo = context.repo.repo;
+            const branch = 'main';
+            const original = await github.rest.repos.getContent({owner, repo, path:'index-original.html', ref:branch});
+            const current = await github.rest.repos.getContent({owner, repo, path:'index.html', ref:branch});
+            const content = Buffer.from(original.data.content, 'base64').toString('utf8');
+            const currentContent = Buffer.from(current.data.content, 'base64').toString('utf8');
+            if (content === currentContent) {
+              console.log('index.html already restored.');
+              return;
+            }
+            await github.rest.repos.createOrUpdateFileContents({
+              owner, repo, branch,
+              path:'index.html',
+              message:'Restore SIPERPUS index safely',
+              content:Buffer.from(content,'utf8').toString('base64'),
+              sha:current.data.sha
+            });
+            console.log('index.html restored from index-original.html.');
