@@ -1,9 +1,14 @@
-# SIPERPUS SD V1
+# SIPERPUS SD V2
 
-Sistem Perpustakaan SD — fondasi V1.
+Sistem Perpustakaan SD — GitHub Pages → Cloudflare Worker API → Cloudflare D1.
 
-## Isi V1
-- Login demo
+## Backend deployment check
+- Worker name: `siperpus`
+- Entry point: `src/index.js`
+- D1 binding: `DB`
+
+## Fitur
+- Login backend
 - Dashboard
 - Data buku
 - Data anggota
@@ -11,23 +16,13 @@ Sistem Perpustakaan SD — fondasi V1.
 - Pengembalian
 - Statistik dasar
 
-## Demo lokal
-Buka `index.html` di browser.
-
-Akun demo:
-- Username: `admin`
-- Password: `admin123`
-
-> Mode demo menyimpan data di localStorage. Jangan gunakan akun/password ini untuk produksi.
-
 ## Database
-`schema.sql` berisi rancangan Cloudflare D1 untuk tahap backend.
+`schema.sql` berisi rancangan Cloudflare D1.
 
-## Arsitektur target
+## Arsitektur
 GitHub Pages → Cloudflare Worker API → Cloudflare D1
 
-## Roadmap V2
-- Login backend aman + session/token
+## Roadmap
 - Import CSV siswa/buku
 - Barcode/QR
 - Kartu anggota
@@ -35,3 +30,5 @@ GitHub Pages → Cloudflare Worker API → Cloudflare D1
 - Kunjungan perpustakaan
 - Pengaturan denda
 - Backup/restore
+
+<!-- Cloudflare Workers Builds trigger check 2026-09-08 -->
